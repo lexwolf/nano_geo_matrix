@@ -45,13 +45,14 @@
  * so numerical_output(E0, q, p) gives p2(t) if q is in PDF order.
  */
 
-#ifndef NANO_GEO_MATRIX_QUASI_STATIC_GEOMETRY_SINGLE_HPP
-#define NANO_GEO_MATRIX_QUASI_STATIC_GEOMETRY_SINGLE_HPP
+#ifndef SINGLE_H
+#define SINGLE_H
 
 #define CUP_HAS_FROHLICH_GEOMETRY 1
 #define CUP_GEOMETRY_SINGLE 1
 
 #include <complex>
+#include <armadillo>
 
 // ------------------------------------------------------------
 // p-coefficients for uniform inversion (cf. PDF Eq. 36–37)
@@ -178,4 +179,4 @@ inline std::complex<double> numerical_output(double E0,
     return p[0]*q[0] + p[1]*q[1] + p[2]*q[2] + p[3]*E0;
 }
 
-#endif // NANO_GEO_MATRIX_QUASI_STATIC_GEOMETRY_SINGLE_HPP
+#endif // SINGLE_H
