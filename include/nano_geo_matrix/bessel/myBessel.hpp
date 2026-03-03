@@ -20,6 +20,9 @@
 #include <complex_bessel.h>
 #include <nano_geo_matrix/core/extract.hpp>
 
+#define NANO_GEO_MATRIX_BESSEL_API_PRESENT 1
+#define NANO_GEO_MATRIX_BESSEL_BACKEND_COMPLEX_BESSEL 1
+
 using namespace sp_bessel;
 
 // Bessel Functions.
@@ -53,4 +56,3 @@ inline auto ξp = [](int n, std::complex<double> z) { return RBh_prime(n, z); };
 // Optional: non-derivative Riccati–Bessel if you want symmetry
 inline auto ψ = [](int n, std::complex<double> z) { return RBj(n, z); };
 inline auto ξ = [](int n, std::complex<double> z) { return RBh(n, z); };
-

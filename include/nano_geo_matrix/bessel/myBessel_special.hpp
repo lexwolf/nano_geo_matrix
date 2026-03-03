@@ -27,6 +27,9 @@
 #include <iostream>
 #include <utility>
 
+#define NANO_GEO_MATRIX_BESSEL_API_PRESENT 1
+#define NANO_GEO_MATRIX_BESSEL_BACKEND_SPECIAL 1
+
 // Declare the Fortran subroutine with the correct mangled name
 extern "C" {
     void csphjy_(int* n, std::complex<double>* z, int* nm,

@@ -25,6 +25,23 @@
 #include <complex>
 #include <armadillo>
 
+// Pull one Bessel backend only if none has been included already.
+#ifndef NANO_GEO_MATRIX_BESSEL_API_PRESENT
+  #if (defined(USE_MYBESSEL_BL) + defined(USE_MYBESSEL) + defined(USE_MYBESSEL_SPECIAL)) > 1
+    #error "Define only one of USE_MYBESSEL_BL, USE_MYBESSEL, USE_MYBESSEL_SPECIAL."
+  #endif
+
+  #if defined(USE_MYBESSEL_BL)
+    #include <nano_geo_matrix/bessel/myBessel_bl.hpp>
+  #elif defined(USE_MYBESSEL)
+    #include <nano_geo_matrix/bessel/myBessel.hpp>
+  #elif defined(USE_MYBESSEL_SPECIAL)
+    #include <nano_geo_matrix/bessel/myBessel_special.hpp>
+  #else
+    #error "No Bessel backend selected and no myBessel header pre-included."
+  #endif
+#endif
+
 std::complex<double>** coefficients(std::complex<double> OmeG, std::complex<double> OmeM, std::complex<double> GamGxN, std::complex<double> GamM, std::complex<double>* p0, std::complex<double>* p1, std::complex<double>* p2, std::complex<double>* p3, int J=0){
     std::complex<double>** A = 0;
       A = new std::complex<double>*[5];

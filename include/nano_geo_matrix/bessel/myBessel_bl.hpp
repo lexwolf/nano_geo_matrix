@@ -23,6 +23,9 @@
 #include <complex>
 #include <nano_geo_matrix/core/extract.hpp>
 
+#define NANO_GEO_MATRIX_BESSEL_API_PRESENT 1
+#define NANO_GEO_MATRIX_BESSEL_BACKEND_BL 1
+
 using namespace bessel;
 
 // Bessel Functions.
