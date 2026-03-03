@@ -1,0 +1,11 @@
+/build/
+/cmake-build-*/
+/*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.exe
+*.mod
+*.MOD
+build/
