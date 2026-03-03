@@ -9,8 +9,14 @@ target_include_directories(nano_geo_matrix INTERFACE
   $<INSTALL_INTERFACE:include>
 )
 
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
-target_link_libraries(nano_geo_matrix INTERFACE Eigen3::Eigen)
+# Prefer config mode (provides Eigen3::Eigen). Fall back to module mode for portability.
+find_package(Eigen3 3.3 QUIET NO_MODULE)
+if(Eigen3_FOUND)
+  target_link_libraries(nano_geo_matrix INTERFACE Eigen3::Eigen)
+else()
+  find_package(Eigen3 3.3 REQUIRED)
+  target_include_directories(nano_geo_matrix INTERFACE ${EIGEN3_INCLUDE_DIRS})
+endif()
 
 find_package(Armadillo REQUIRED)
 target_include_directories(nano_geo_matrix INTERFACE ${ARMADILLO_INCLUDE_DIRS})
