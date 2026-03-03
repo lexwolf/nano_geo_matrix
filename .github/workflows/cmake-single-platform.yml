@@ -18,7 +18,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install dependencies (Eigen3, Armadillo)
+    - name: Install dependencies (Eigen3, Armadillo, GSL)
       run: |
         sudo apt-get update
         sudo apt-get install -y \
@@ -26,6 +26,7 @@ jobs:
           libarmadillo-dev \
           libopenblas-dev \
           liblapack-dev \
+          libgsl-dev \
           gfortran
 
     - name: Configure CMake
