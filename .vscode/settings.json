@@ -1,3 +1,14 @@
 {
-  "C_Cpp.default.compileCommands": "/home/alessandro/GitHub/Academia/nano_geo_matrix/build/compile_commands.json"
+  "C_Cpp.default.compileCommands": "{workspaceFolder}/build/compile_commands.json",
+  "C_Cpp.default.compilerPath": "/usr/bin/g++-13",
+  "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.intelliSenseEngineFallback": "default",
+  "C_Cpp.default.browse.path": [
+    "${workspaceFolder}/include",
+    "/usr/include/eigen3"
+  ],
+  "C_Cpp.default.includePath": [
+    "${workspaceFolder}/include",
+    "/usr/include/eigen3"
+  ]
 }
