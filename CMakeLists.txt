@@ -4,10 +4,6 @@ project(nano_geo_matrix VERSION 0.1.0 LANGUAGES CXX)
 add_library(nano_geo_matrix INTERFACE)
 target_compile_features(nano_geo_matrix INTERFACE cxx_std_17)
 
-add_library(ngm_intellisense_cup_qs OBJECT tests/intellisense/cup_qs_intellisense.cpp)
-target_link_libraries(ngm_intellisense_cup_qs PRIVATE nano_geo_matrix)
-target_compile_definitions(ngm_intellisense_cup_qs PRIVATE CUP_BACKEND_QUASI_STATIC)
-
 target_include_directories(nano_geo_matrix INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
