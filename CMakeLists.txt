@@ -9,6 +9,8 @@ target_include_directories(nano_geo_matrix INTERFACE
   $<INSTALL_INTERFACE:include>
 )
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Prefer config mode (provides Eigen3::Eigen). Fall back to module mode for portability.
 find_package(Eigen3 3.3 QUIET NO_MODULE)
 if(Eigen3_FOUND)
@@ -21,6 +23,14 @@ endif()
 find_package(Armadillo REQUIRED)
 target_include_directories(nano_geo_matrix INTERFACE ${ARMADILLO_INCLUDE_DIRS})
 target_link_libraries(nano_geo_matrix INTERFACE ${ARMADILLO_LIBRARIES})
+
+find_package(GSL REQUIRED)
+
+target_link_libraries(nano_geo_matrix
+  INTERFACE
+    GSL::gsl
+    GSL::gslcblas
+)
 
 # ---- Bessel backend selection (after target exists!) ----
 set(NGM_BESSEL_BACKEND "BL" CACHE STRING "Bessel backend: BL, COMPLEX_BESSEL, SPECIAL")

@@ -13,9 +13,6 @@
 #include <iostream>
 #include <stdexcept>
 
-#include <nano_geo_matrix/mie/geometry/gimme_p.hpp>  // declares pcfc0, ..., pcfc3
-#include <nano_geo_matrix/mie/geometry/single.hpp>   // declares coefficients
-
 template<typename Func>
 double xzero(Func f, double a, double b, double tol = 1e-20, int max_iter = 1000) {
 
@@ -683,3 +680,5 @@ inline double* nanosphere::frohlich_optimal(int order, double a0, double b0, dou
     return reso;
 
 }
+
+#endif
