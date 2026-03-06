@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.16)
 project(nano_geo_matrix VERSION 0.1.0 LANGUAGES CXX)
 
 add_library(nano_geo_matrix INTERFACE)
+# target_compile_definitions(
+#   nano_geo_matrix
+#   INTERFACE
+#   NGM_DATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"
+# )
 target_compile_features(nano_geo_matrix INTERFACE cxx_std_17)
 
 target_include_directories(nano_geo_matrix INTERFACE
