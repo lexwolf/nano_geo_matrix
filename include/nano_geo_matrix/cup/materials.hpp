@@ -134,10 +134,10 @@ inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, in
         double* reps = new double[rows];
         double* ieps = new double[rows];
 
-        for (int i = 0; i < rows; ++i) {
-            omem[i] = omem_vec[static_cast<std::size_t>(i)];
-            reps[i] = reps_vec[static_cast<std::size_t>(i)];
-            ieps[i] = ieps_vec[static_cast<std::size_t>(i)];
+        for (std::size_t i = 0; i < rows; ++i) {
+            omem[i] = omem_vec[i];
+            reps[i] = reps_vec[i];
+            ieps[i] = ieps_vec[i];
         }
 
         acc   = gsl_interp_accel_alloc();
