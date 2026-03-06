@@ -92,12 +92,21 @@ inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, in
     else if (mdl == "spline") {
         spln = 1;
 
-        const fs::path jcfile =
-            fs::path{"."} / "data" / "materials" / "metals" / spec->jc_filename;
+        const fs::path jc_rel =
+            fs::path{"data"} / "materials" / "metals" / spec->jc_filename;
 
-        std::ifstream inp(jcfile);
+        std::ifstream inp;
+        fs::path jcfile;
+        for (const fs::path& prefix : {fs::path{"."}, fs::path{".."}, fs::path{"../.."}}) {
+            jcfile = prefix / jc_rel;
+            inp.open(jcfile);
+            if (inp) {
+                break;
+            }
+            inp.clear();
+        }
         if (!inp) {
-            fail("could not open " + jcfile.string());
+            fail("could not open " + jc_rel.string() + " (tried ./, ../, ../../)");
         }
 
         std::vector<double> omem_vec;
