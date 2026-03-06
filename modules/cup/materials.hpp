@@ -14,10 +14,6 @@
 #include <string_view>
 #include <vector>
 
-#ifndef NGM_DATA_DIR
-#define NGM_DATA_DIR "data"
-#endif
-
 inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, int sel)
 {
     namespace fs = std::filesystem;
@@ -97,7 +93,7 @@ inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, in
         spln = 1;
 
         const fs::path jcfile =
-            fs::path{NGM_DATA_DIR} / "materials" / "metals" / spec->jc_filename;
+            fs::path{"."} / "data" / "materials" / "metals" / spec->jc_filename;
 
         std::ifstream inp(jcfile);
         if (!inp) {
