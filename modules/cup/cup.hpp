@@ -110,21 +110,24 @@ public:
 
     std::vector<std::pair<double,double>>
     cross_sections(char* mdl , char* mtl ,char* hst,
-                   double omemi, double omema, int omeN=10000, char* sol=0, double rho=0);
+                   double omemi, double omema, int omeN=10000, char* sol=0, double rho=0,
+                   const char* output = "../data/output");
 
     std::vector<std::pair<double,std::complex<double>>>
     steady_state(char* mdl , char* mtl ,char* hst,
-                 double omemi, double omema, int omeN=10000, char* sol=0, double rho=0);
+                 double omemi, double omema, int omeN=10000, char* sol=0, double rho=0,
+                 const char* output = "../data/output");
 
     std::complex<double>
     numerical(char* mdl, char* mtl, char* hst,
               double E0, double omeeV, double T, double tpump,
-              char* sol=0, double rho=0, const char* pump_md="step", bool evolve_N=true);
+              char* sol=0, double rho=0, const char* pump_md="step", bool evolve_N=true,
+              const char* output = "../data/output");
 
     std::complex<double>
     analytical(char* mdl , char* mtl ,char* hst,
                double E0, double omeeV, double T, double tpump,
-               char* sol=0, double rho=0);
+               char* sol=0, double rho=0, const char* output = "../data/output");
 #endif
 
 #ifdef CUP_BACKEND_MIE
@@ -159,21 +162,24 @@ public:
 
     std::vector<std::pair<double,double>>
     cross_sections(int orders, char* mdl , char* mtl ,char* hst,
-                   double omemi, double omema, int omeN=10000, char* sol=0, double rho=0);
+                   double omemi, double omema, int omeN=10000, char* sol=0, double rho=0,
+                   const char* output = "../data/output");
 
     std::vector<std::pair<double,std::complex<double>>>
     steady_state(int order, char* mdl , char* mtl ,char* hst,
-                 double omemi, double omema, int omeN=10000, char* sol=0, double rho=0);
+                 double omemi, double omema, int omeN=10000, char* sol=0, double rho=0,
+                 const char* output = "../data/output");
 
     std::complex<double>
     numerical(int order, char* mdl , char* mtl ,char* hst,
               double E0, double omeeV, double T, double tpump,
-              char* sol=0, double rho=0, const char* pump_md="step", bool evolve_N=true);
+              char* sol=0, double rho=0, const char* pump_md="step", bool evolve_N=true,
+              const char* output = "../data/output");
 
     std::complex<double>
     analytical(int order, char* mdl , char* mtl ,char* hst,
                double E0, double omeeV, double T, double tpump,
-               char* sol=0, double rho=0);
+               char* sol=0, double rho=0, const char* output = "../data/output");
 
 #endif
 }; // class nanosphere
