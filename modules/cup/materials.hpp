@@ -14,6 +14,17 @@
 #include <string_view>
 #include <vector>
 
+inline std::filesystem::path ngm_cup_materials_dir()
+{
+    namespace fs = std::filesystem;
+
+#ifdef NGM_CUP_DATA_DIR
+    return fs::path{NGM_CUP_DATA_DIR} / "materials" / "metals";
+#else
+    return fs::path(__FILE__).parent_path() / "data" / "materials" / "metals";
+#endif
+}
+
 inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, int sel)
 {
     namespace fs = std::filesystem;
@@ -92,9 +103,7 @@ inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, in
     else if (mdl == "spline") {
         spln = 1;
 
-        const fs::path jcfile =
-            fs::path{__FILE__}.parent_path() /
-            "data" / "materials" / "metals" / spec->jc_filename;
+        const fs::path jcfile = ngm_cup_materials_dir() / spec->jc_filename;
 
         std::ifstream inp(jcfile);
         if (!inp) {
