@@ -178,7 +178,6 @@ inline std::vector<std::pair<double,std::complex<double>>>  nanosphere::steady_s
 	    int omi;
 	    double ome, omeeV, dome  = (omema-omemi)/omeN;
 	    const auto g = cup_qs_detail::make_geometry_context(*this, hst, sol, rho);
-	    const int ns = g.ns;
 	    const double eps_b = g.eps_b;
 	    const double eps_s = g.eps_s;
 	    std::complex<double> alph;
@@ -335,7 +334,6 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
     constexpr int Nsys = 3;
 	PumpMode pm = pump_mode(pump_md);
     const auto g = cup_qs_detail::make_geometry_context(*this, hst, sol, rho);
-    const int ns = g.ns;
     const double eps_b = g.eps_b;
     const double eps_s = g.eps_s;
     double ome, dt;
@@ -410,7 +408,7 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
     p2 = pcfc2(ceps_inf, eps_b, eps_s, g.rho);
     p3 = pcfc3(ceps_inf, eps_b, eps_s, g.rho);
 
-    p = (ns == 1) ? p3 : p0;
+    p = g.is_shell ? p3 : p0;
 
     ome = omeeV / Ome_p;
 
@@ -490,7 +488,7 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
                  << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(dip - E0)
                  << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(dip - E0)
                  << "\t" << std::setw(13) << std::setiosflags(std::ios::left)
-                 << joule_heating(ns, ome, (dip - E0), q[2])
+                 << joule_heating(g.ns, ome, (dip - E0), q[2])
                  << "\n";
 
             fnct << "  " << std::setw(8) << std::setiosflags(std::ios::left) << t_ps
