@@ -2,7 +2,36 @@
 #define CUP_QUASI_STATIC_SOLVERS_H
 
 #include "../pump.hpp"
+
+#ifdef h
+#pragma push_macro("h")
+#undef h
+#define CUP_RESTORE_h_MACRO
+#endif
+#ifdef cc
+#pragma push_macro("cc")
+#undef cc
+#define CUP_RESTORE_cc_MACRO
+#endif
+#include <nano_geo_matrix/core/mathNN.hpp>
+#ifdef CUP_RESTORE_cc_MACRO
+#pragma pop_macro("cc")
+#undef CUP_RESTORE_cc_MACRO
+#endif
+#ifdef h
+#pragma push_macro("h")
+#undef h
+#define CUP_RESTORE_h_FS_MACRO
+#endif
 #include <filesystem>
+#ifdef CUP_RESTORE_h_FS_MACRO
+#pragma pop_macro("h")
+#undef CUP_RESTORE_h_FS_MACRO
+#endif
+#ifdef CUP_RESTORE_h_MACRO
+#pragma pop_macro("h")
+#undef CUP_RESTORE_h_MACRO
+#endif
 
 // Quasi-static solver routines extracted from cup.H.
 // Note: default arguments must appear only in declarations (inside class nanosphere).
@@ -41,27 +70,24 @@ inline std::vector<std::pair<double,double>>  nanosphere::cross_sections(char* m
 			ns = 1;
 			} else  eps_s=0;
 			eps_b = set_host(hst);
-			double rE;
-			lam_nm  = h * cc * 1.e9 / (omeeV * eV2j); // lam in nm
-			if (ns == 0){
-				eps1 = metal(omeeV);
-				eps2 = active(omeeV, eps_b);
-				rE   = a;
-			}
-			if (ns == 1){
-				eps1 = active(omeeV, eps_b);
-				eps2 = metal(omeeV);
-				eps3 = eps_s;
-				rE   = a;
-			}
-			lam = lam_nm / rE; // lam normalized
-			n2 = sqrt(eps2);
-			k = 2. * M_PI * n2 / lam;
+			double rE = a;
 
 	// 	    std::complex<double> eps1, eps2, m, x, k, n1, n2;
 			for (omi = 0; omi <= omeN; omi++){
 				omeeV = omemi + omi * dome;
 				lam_nm  = h * cc * 1.e9 / (omeeV * eV2j); // lam in nm
+
+				if (ns == 0){
+					eps1 = metal(omeeV);
+					eps2 = active(omeeV, eps_b);
+				}
+				if (ns == 1){
+					eps1 = active(omeeV, eps_b);
+					eps2 = metal(omeeV);
+				}
+				lam = lam_nm / rE; // lam normalized
+				n2 = sqrt(eps2);
+				k = 2. * M_PI * n2 / lam;
 				
 				alph = polarizability(eps1, eps2);
 
@@ -479,6 +505,7 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* hst,
 								double E0, double omeeV, double T, double tpump,
 								char* sol, double rho, const char* output){
+		constexpr int Nsys = 3;
 
 		double eps_b, eps_s, ome, dt, dnormem=1.e20;
     		if ((sol != NULL)) eps_s=set_host(sol);

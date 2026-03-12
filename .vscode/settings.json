@@ -4,9 +4,6 @@
   "C_Cpp.default.cppStandard": "c++17",
   "C_Cpp.intelliSenseEngine": "default",
   "C_Cpp.intelliSenseEngineFallback": "default",
-  "C_Cpp.default.forcedInclude": [
-    "${workspaceFolder}/modules/cup/cup.hpp"
-  ],
   "C_Cpp.default.browse.path": [
     "${workspaceFolder}/modules/**",
     "${workspaceFolder}/include/**",
