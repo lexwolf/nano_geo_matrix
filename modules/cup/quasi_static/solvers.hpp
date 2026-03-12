@@ -4,6 +4,13 @@
 // When this header is parsed standalone by editors (IntelliSense),
 // ensure nanosphere and shared constants are visible.
 #if defined(__INTELLISENSE__) && !defined(CUP_H)
+# if !defined(CUP_HAS_FROHLICH_GEOMETRY)
+#  if defined(CUP_GEOMETRY_NANOSHELL)
+#   include <nano_geo_matrix/quasi_static/geometry/nanoshell.hpp>
+#  else
+#   include <nano_geo_matrix/quasi_static/geometry/single.hpp>
+#  endif
+# endif
 # if !defined(CUP_BACKEND_QUASI_STATIC) && !defined(CUP_BACKEND_MIE)
 #  define CUP_BACKEND_QUASI_STATIC
 #  define CUP_INTELLISENSE_DEFINED_BACKEND
@@ -47,6 +54,57 @@
 #undef CUP_RESTORE_h_MACRO
 #endif
 
+namespace cup_qs_detail {
+
+struct GeometryContext {
+    bool is_shell;
+    int ns;
+    double eps_b;
+    double eps_s;
+    double rho;
+};
+
+struct PermittivityContext {
+    std::complex<double> eps1;
+    std::complex<double> eps2;
+    double eps3;
+};
+
+inline GeometryContext make_geometry_context(
+    nanosphere& s,
+    const char* hst,
+    const char* sol,
+    double rho)
+{
+    GeometryContext ctx{};
+    ctx.is_shell = (sol != nullptr);
+    ctx.ns = ctx.is_shell ? 1 : 0;
+    ctx.eps_b = s.set_host(hst);
+    ctx.eps_s = ctx.is_shell ? s.set_host(sol) : 0.0;
+    ctx.rho = rho;
+    return ctx;
+}
+
+inline PermittivityContext make_permittivity_context(
+    nanosphere& s,
+    double omeeV,
+    const GeometryContext& g)
+{
+    PermittivityContext p{};
+    if (!g.is_shell) {
+        p.eps1 = s.metal(omeeV);           // metal core for single particle
+        p.eps2 = s.active(omeeV, g.eps_b); // active host
+        p.eps3 = 0.0;
+    } else {
+        p.eps1 = s.active(omeeV, g.eps_b); // active core for nanoshell
+        p.eps2 = s.metal(omeeV);           // metal shell
+        p.eps3 = g.eps_s;
+    }
+    return p;
+}
+
+} // namespace cup_qs_detail
+
 // Quasi-static solver routines extracted from cup.H.
 // Note: default arguments must appear only in declarations (inside class nanosphere).
 
@@ -59,10 +117,10 @@ inline double nanosphere::Rabi_frec(double G, double tau2, double E0){
 
 inline std::vector<std::pair<double,double>>  nanosphere::cross_sections(char* mdl , char* mtl ,char* hst ,double omemi, double omema, int omeN, char* sol, double rho, const char* output){
 
-			int omi, ns=0;
+			int omi;
 			double pG = fabs(G), omeeV, dome  = (omema-omemi)/omeN, lam_nm, lam;
-			double Csca, Cext, Cabs, eps_s, eps_b;
-			std::complex<double> alph, eps1, eps2, k, n2;
+			double Csca, Cext, Cabs;
+			std::complex<double> alph, k, n2;
 			std::ofstream crsc;
 			namespace fs = std::filesystem;
 			const fs::path out_base(output);
@@ -79,11 +137,7 @@ inline std::vector<std::pair<double,double>>  nanosphere::cross_sections(char* m
 			crsc<<"#"<<std::endl;
 			
 			std::vector<std::pair<double,double>> vext;
-			if (sol != NULL) {
-			eps_s = set_host(sol);
-			ns = 1;
-			} else  eps_s=0;
-			eps_b = set_host(hst);
+			const auto g = cup_qs_detail::make_geometry_context(*this, hst, sol, rho);
 			double rE = a;
 
 	// 	    std::complex<double> eps1, eps2, m, x, k, n1, n2;
@@ -91,19 +145,12 @@ inline std::vector<std::pair<double,double>>  nanosphere::cross_sections(char* m
 				omeeV = omemi + omi * dome;
 				lam_nm  = h * cc * 1.e9 / (omeeV * eV2j); // lam in nm
 
-				if (ns == 0){
-					eps1 = metal(omeeV);
-					eps2 = active(omeeV, eps_b);
-				}
-				if (ns == 1){
-					eps1 = active(omeeV, eps_b);
-					eps2 = metal(omeeV);
-				}
+				const auto p = cup_qs_detail::make_permittivity_context(*this, omeeV, g);
 				lam = lam_nm / rE; // lam normalized
-				n2 = sqrt(eps2);
+				n2 = sqrt(p.eps2);
 				k = 2. * M_PI * n2 / lam;
 				
-				alph = polarizability(eps1, eps2);
+				alph = polarizability(p.eps1, p.eps2, p.eps3, g.rho);
 
 				double kreal = k.real();
 				double kimag = k.imag();
@@ -128,20 +175,17 @@ inline std::vector<std::pair<double,double>>  nanosphere::cross_sections(char* m
 
 inline std::vector<std::pair<double,std::complex<double>>>  nanosphere::steady_state(char* mdl , char* mtl ,char* hst ,double omemi, double omema, int omeN, char* sol, double rho, const char* output){
 
-	    int omi, ns=0;
-	    double eps_b, eps_s, ome, omeeV, dome  = (omema-omemi)/omeN;
-
-	    if ((sol != NULL)) {
-		eps_s=set_host(sol);
-		ns=1;
-		}
-		else eps_s=0;
-	    eps_b=set_host(hst);
-	    std::complex<double> eps1, eps2, alph;
+	    int omi;
+	    double ome, omeeV, dome  = (omema-omemi)/omeN;
+	    const auto g = cup_qs_detail::make_geometry_context(*this, hst, sol, rho);
+	    const int ns = g.ns;
+	    const double eps_b = g.eps_b;
+	    const double eps_s = g.eps_s;
+	    std::complex<double> alph;
 
 	    std::vector<std::pair<double,std::complex<double>>> valph;
 	    
-	    double tau2, gamd, ome_g, eps3, pG = fabs(G), *nv;
+	    double tau2, gamd, ome_g, pG = fabs(G), *nv;
 	    std::complex<double> GamG, OmeG, GamM, OmeM, *p0, *p1, *p2, **A, detA, *kap, *odv;
 	    
 	    A = new std::complex<double>*[3];
@@ -218,16 +262,8 @@ inline std::vector<std::pair<double,std::complex<double>>>  nanosphere::steady_s
 
 	    for (omi=0; omi<=omeN; omi++){
 		omeeV = omemi + omi*dome;
-		if (ns == 0){
-		    eps1 = metal(omeeV);
-		    eps2 = active(omeeV,eps_b);
-		    }
-		if (ns == 1){
-		    eps1 = active(omeeV,eps_b);
-		    eps2 = metal(omeeV);
-		    eps3 = eps_s;
-		    }
-		alph = polarizability(eps1, eps2, eps3, rho);
+		const auto p = cup_qs_detail::make_permittivity_context(*this, omeeV, g);
+		alph = polarizability(p.eps1, p.eps2, p.eps3, g.rho);
 		
 		valph.push_back(std::make_pair(omeeV, alph));
 		
@@ -237,10 +273,10 @@ inline std::vector<std::pair<double,std::complex<double>>>  nanosphere::steady_s
 		      std::endl;
 
 		comp<<"  "<<std::setw(8)<<std::setiosflags (std::ios::left)<<omeeV<<     // 1 ome
-		    "\t"<<std::setw(11)<<std::setiosflags (std::ios::left)<<real(eps1)<< // 2 Re(eps1)
-		    "\t"<<std::setw(11)<<std::setiosflags (std::ios::left)<<imag(eps1)<< // 3 Im(eps1)
-		    "\t"<<std::setw(11)<<std::setiosflags (std::ios::left)<<real(eps2)<< // 4 Re(eps2)
-		    "\t"<<std::setw(11)<<std::setiosflags (std::ios::left)<<imag(eps2)<< // 5 Im(eps2)
+		    "\t"<<std::setw(11)<<std::setiosflags (std::ios::left)<<real(p.eps1)<< // 2 Re(eps1)
+		    "\t"<<std::setw(11)<<std::setiosflags (std::ios::left)<<imag(p.eps1)<< // 3 Im(eps1)
+		    "\t"<<std::setw(11)<<std::setiosflags (std::ios::left)<<real(p.eps2)<< // 4 Re(eps2)
+		    "\t"<<std::setw(11)<<std::setiosflags (std::ios::left)<<imag(p.eps2)<< // 5 Im(eps2)
 		    std::endl;
 
 		p0 = pcfc0(ceps_inf, eps_b, eps_s, rho);
@@ -298,15 +334,15 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 
     constexpr int Nsys = 3;
 	PumpMode pm = pump_mode(pump_md);
-    double eps_b, eps_s, ome, dt;
+    const auto g = cup_qs_detail::make_geometry_context(*this, hst, sol, rho);
+    const int ns = g.ns;
+    const double eps_b = g.eps_b;
+    const double eps_s = g.eps_s;
+    double ome, dt;
     double dnormem = 1.e20, dnavr = 0, dnavrm = 1.e20;
 
     std::vector<std::complex<double>> wave;
-    int ns = 0, wb = 0;
-    if (sol != NULL) { eps_s = set_host(sol); ns = 1; }
-    else eps_s = 0;
-
-    eps_b = set_host(hst);
+    int wb = 0;
 
     int steste = 0;
     std::complex<double> eps1e, eps2e, alph;
@@ -369,10 +405,10 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 
     metal(omeeV); // needed to calculate ceps_inf
 
-    p0 = pcfc0(ceps_inf, eps_b, eps_s, rho); // assume each returns new complex[3]
-    p1 = pcfc1(ceps_inf, eps_b, eps_s, rho);
-    p2 = pcfc2(ceps_inf, eps_b, eps_s, rho);
-    p3 = pcfc3(ceps_inf, eps_b, eps_s, rho);
+    p0 = pcfc0(ceps_inf, eps_b, eps_s, g.rho); // assume each returns new complex[3]
+    p1 = pcfc1(ceps_inf, eps_b, eps_s, g.rho);
+    p2 = pcfc2(ceps_inf, eps_b, eps_s, g.rho);
+    p3 = pcfc3(ceps_inf, eps_b, eps_s, g.rho);
 
     p = (ns == 1) ? p3 : p0;
 
@@ -427,7 +463,7 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 		tildeN = gimme_tildeN(t_ps, tpump, pm, tNmin, tNmax);
 
 		if (evolve_N) {
-			if (ns == 1) {
+			if (g.is_shell) {
 				po = numerical_output(E0, q, p0);
 				N  = Runge_Kutta_mono_4(N, -1./tau1, tildeN/tau1 + imag(q[0]*conj(po)), dt);
 			} else {
@@ -492,7 +528,7 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
         }
     }
 
-    if (ns == 1) {
+    if (g.is_shell) {
         if (!wave.empty()) nOme = find_Ome_fourier((int)wave.size(), wave, dt, no_fourier_dump());
         else nOme = 0.;
     }
@@ -521,10 +557,10 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 								char* sol, double rho, const char* output){
 		constexpr int Nsys = 3;
 
-		double eps_b, eps_s, ome, dt, dnormem=1.e20;
-    		if ((sol != NULL)) eps_s=set_host(sol);
-		    else eps_s=0;
-		eps_b=set_host(hst);
+		const auto g = cup_qs_detail::make_geometry_context(*this, hst, sol, rho);
+		const double eps_b = g.eps_b;
+		const double eps_s = g.eps_s;
+		double ome, dt, dnormem=1.e20;
 		int steste=0, amp=0;
 		std::complex<double> eps1e, eps2e, eps1, eps2, alph;
 		double omep, t, t_ps, tau1, tau2, gamd, ome_g, pG = fabs(G), *nv, N, tildeN;
@@ -608,12 +644,11 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 		ome_g = nv[3];
 	
 		metal(omeeV); //needed to calculate ceps_inf
-		p0 = pcfc0(ceps_inf, eps_b, eps_s, rho);
-		p1 = pcfc1(ceps_inf, eps_b, eps_s, rho);
-		p2 = pcfc2(ceps_inf, eps_b, eps_s, rho);
-		p3 = pcfc3(ceps_inf, eps_b, eps_s, rho);
-		if ((sol != NULL)) p=p3;
-		    else p=p0;
+		p0 = pcfc0(ceps_inf, eps_b, eps_s, g.rho);
+		p1 = pcfc1(ceps_inf, eps_b, eps_s, g.rho);
+		p2 = pcfc2(ceps_inf, eps_b, eps_s, g.rho);
+		p3 = pcfc3(ceps_inf, eps_b, eps_s, g.rho);
+		p = g.is_shell ? p3 : p0;
 		ome = omeeV/Ome_p;
 		
 			
