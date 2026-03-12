@@ -1,6 +1,20 @@
 #ifndef CUP_QUASI_STATIC_SOLVERS_H
 #define CUP_QUASI_STATIC_SOLVERS_H
 
+// When this header is parsed standalone by editors (IntelliSense),
+// ensure nanosphere and shared constants are visible.
+#if defined(__INTELLISENSE__) && !defined(CUP_H)
+# if !defined(CUP_BACKEND_QUASI_STATIC) && !defined(CUP_BACKEND_MIE)
+#  define CUP_BACKEND_QUASI_STATIC
+#  define CUP_INTELLISENSE_DEFINED_BACKEND
+# endif
+# include "../cup.hpp"
+# ifdef CUP_INTELLISENSE_DEFINED_BACKEND
+#  undef CUP_BACKEND_QUASI_STATIC
+#  undef CUP_INTELLISENSE_DEFINED_BACKEND
+# endif
+#endif
+
 #include "../pump.hpp"
 
 #ifdef h
