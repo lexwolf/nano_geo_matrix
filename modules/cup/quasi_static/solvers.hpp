@@ -373,20 +373,21 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
     double tNmin = 0.0;
 	double tNmax = 1.0;
 
-    double N;
-    omeR = Rabi_frec(G, tau2, E0);
+	double N = 0.0;
 
-    int i = 0;
+	omeR = Rabi_frec(G, tau2, E0);
 
-    while (i <= Nt) {
-        t = i * dt;
-        t_ps = t * 1.e+12 / omep; // time in picoseconds
-        i++;
+	int i = 0;
+
+	while (i <= Nt) {
+		t = i * dt;
+		t_ps = t * 1.e+12 / omep; // time in picoseconds
+		i++;
 
 		tildeN = gimme_tildeN(t_ps, tpump, pm, tNmin, tNmax);
 
 		if (evolve_N) {
-			if (ns==1) {
+			if (ns == 1) {
 				po = numerical_output(E0, q, p0);
 				N  = Runge_Kutta_mono_4(N, -1./tau1, tildeN/tau1 + imag(q[0]*conj(po)), dt);
 			} else {
@@ -396,12 +397,12 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 			N = tildeN;
 		}
 
-        rebuild_AB(N);
-        Runge_Kutta_4(q, A, B, dt, Nsys);
+		rebuild_AB(N);
+		Runge_Kutta_4(q, A, B, dt, Nsys);
 
-        dnormem = steste * norm(dip);
-        dip  = numerical_output(E0, q, p);
-        alph = dip / E0;
+		dnormem = steste * norm(dip);
+		dip  = numerical_output(E0, q, p);
+		alph = dip / E0;
 
         if (i % iprint == 0) {
             dyna << "  " << std::setw(8) << std::setiosflags(std::ios::left) << t_ps
