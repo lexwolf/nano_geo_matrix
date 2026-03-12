@@ -183,11 +183,12 @@ inline double nanosphere::set_host(const char* hst){
   else if(strcmp(hst,"solgel")==0) eps_0 = 2.1331;//3.8
   else if(strcmp(hst,"vacuum")==0) eps_0 = 1.0;
   else if(strcmp(hst,"water")==0) eps_0 = 1.7689;
+  else if(strcmp(hst,"air")==0) eps_0 = 1.0006;
   else if(strcmp(hst,"glass")==0) eps_0 = 1.2247;
   else if(strcmp(hst,"PMMA")==0) eps_0 = 2.2201;
   else if(strcmp(hst,"ethanol")==0) eps_0 = 1.8496;//1.1662;
   else{
-std::cout<<"option are: silica, solgel, vacuum, water, glass, PMMA, ethanol"<<std::endl;
+std::cout<<"option are: silica, solgel, vacuum, water, air, glass, PMMA, ethanol"<<std::endl;
 exit(1);
 }
   return eps_0;
