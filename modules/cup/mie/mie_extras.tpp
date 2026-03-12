@@ -4,6 +4,12 @@
 #include <limits>
 #include <cmath>
 
+// MIE-only inline definitions. Keep this file inert when MIE backend is not
+// selected (useful for IntelliSense when browsing with quasi-static config).
+#ifndef CUP_BACKEND_MIE
+
+#else
+
 // ---- parabolic helper (inline)
 inline double parabolic_vertex(double x0,double y0,double x1,double y1,double x2,double y2,
                                double fallback)
@@ -209,3 +215,5 @@ inline ExtFeature nanosphere::mie_min_ext_constrained(int order, double w_lo, do
     this->G = G_save;
     return out;
 }
+
+#endif // CUP_BACKEND_MIE
