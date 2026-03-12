@@ -18,11 +18,19 @@ inline std::filesystem::path ngm_cup_materials_dir()
 {
     namespace fs = std::filesystem;
 
-#ifdef NGM_CUP_DATA_DIR
-    return fs::path{NGM_CUP_DATA_DIR} / "materials" / "metals";
-#else
-    return fs::path(__FILE__).parent_path() / "data" / "materials" / "metals";
-#endif
+    fs::path here{__FILE__};
+
+    // Normalize relative __FILE__ values against the current working directory.
+    if (here.is_relative()) {
+        here = fs::absolute(here);
+    }
+
+    // materials.hpp lives in modules/cup/, so the data folder is beside it.
+    fs::path dir = here.parent_path() / "data" / "materials" / "metals";
+
+    // weakly_canonical is safer than canonical here because it tolerates
+    // some not-yet-existing ancestors better during development.
+    return fs::weakly_canonical(dir);
 }
 
 inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, int sel)
@@ -107,7 +115,10 @@ inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, in
 
         std::ifstream inp(jcfile);
         if (!inp) {
-            fail("could not open " + jcfile.string());
+            std::cerr << "Error: could not open " << jcfile << '\n'
+                    << "__FILE__ = " << __FILE__ << '\n'
+                    << "cwd      = " << fs::current_path() << '\n';
+            std::exit(EXIT_FAILURE);
         }
 
         std::vector<double> omem_vec;
