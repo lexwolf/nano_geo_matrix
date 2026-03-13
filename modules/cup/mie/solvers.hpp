@@ -1,5 +1,26 @@
 #pragma once
 
+// Keep this header inert unless the Mie backend is active. This avoids
+// IntelliSense mixing out-of-class member definitions from both backends.
+#if defined(__INTELLISENSE__) && !defined(CUP_H)
+# if !defined(CUP_HAS_FROHLICH_GEOMETRY)
+#  include <nano_geo_matrix/mie/geometry/single.hpp>
+# endif
+# if !defined(CUP_BACKEND_QUASI_STATIC) && !defined(CUP_BACKEND_MIE)
+#  define CUP_BACKEND_MIE
+#  define CUP_INTELLISENSE_DEFINED_BACKEND
+# endif
+# include "../cup.hpp"
+# ifdef CUP_INTELLISENSE_DEFINED_BACKEND
+#  undef CUP_BACKEND_MIE
+#  undef CUP_INTELLISENSE_DEFINED_BACKEND
+# endif
+#endif
+
+#ifndef CUP_BACKEND_MIE
+
+#else
+
 #include "../pump.hpp"
 #include <filesystem>
 
@@ -628,11 +649,11 @@ inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* m
 
 		// --- cleanup ---------------------------------------------------------
 		free_matrix(A, Nsys);
-		free_vec(B);
-		free_pcfc();
+	free_vec(B);
+	free_pcfc();
 
-		delete[] q;
-		delete[] odv;
+	delete[] q;
+	delete[] odv;
 		delete[] nv;
 
 		return aj;
@@ -890,3 +911,5 @@ inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* 
 
 		return aj;
 	}
+
+#endif // CUP_BACKEND_MIE

@@ -22,6 +22,10 @@
 # endif
 #endif
 
+#ifndef CUP_BACKEND_QUASI_STATIC
+
+#else
+
 #include "../pump.hpp"
 
 #ifdef h
@@ -741,9 +745,11 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 		delete[] p2;
 		delete[] p3;
 		return dip;
-		
+
 }
 
+
+#endif // CUP_BACKEND_QUASI_STATIC
 
 
 #endif // CUP_QUASI_STATIC_SOLVERS_H
