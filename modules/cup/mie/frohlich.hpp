@@ -1,6 +1,25 @@
 #ifndef CUP_MIE_FROHLICH_H
 #define CUP_MIE_FROHLICH_H
 
+#if defined(__INTELLISENSE__) && !defined(CUP_H)
+# if !defined(CUP_HAS_FROHLICH_GEOMETRY)
+#  include <nano_geo_matrix/mie/geometry/single.hpp>
+# endif
+# if !defined(CUP_BACKEND_QUASI_STATIC) && !defined(CUP_BACKEND_MIE)
+#  define CUP_BACKEND_MIE
+#  define CUP_INTELLISENSE_DEFINED_BACKEND
+# endif
+# include "../cup.hpp"
+# ifdef CUP_INTELLISENSE_DEFINED_BACKEND
+#  undef CUP_BACKEND_MIE
+#  undef CUP_INTELLISENSE_DEFINED_BACKEND
+# endif
+#endif
+
+#ifndef CUP_BACKEND_MIE
+
+#else
+
 // Quasi-static Frohlich threshold solvers.
 // Requires geometry kernels F(...) and eqn9(...) provided by nano_geo_matrix/mie/geometry/single.hpp.
 #ifndef CUP_HAS_FROHLICH_GEOMETRY
@@ -12,6 +31,26 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+
+#ifdef h
+#pragma push_macro("h")
+#undef h
+#define CUP_RESTORE_h_MACRO
+#endif
+#ifdef cc
+#pragma push_macro("cc")
+#undef cc
+#define CUP_RESTORE_cc_MACRO
+#endif
+#include <nano_geo_matrix/core/mathNN.hpp>
+#ifdef CUP_RESTORE_cc_MACRO
+#pragma pop_macro("cc")
+#undef CUP_RESTORE_cc_MACRO
+#endif
+#ifdef CUP_RESTORE_h_MACRO
+#pragma pop_macro("h")
+#undef CUP_RESTORE_h_MACRO
+#endif
 
 template<typename Func>
 double xzero(Func f, double a, double b, double tol = 1e-20, int max_iter = 1000) {
@@ -680,5 +719,7 @@ inline double* nanosphere::frohlich_optimal(int order, double a0, double b0, dou
     return reso;
 
 }
+
+#endif // CUP_BACKEND_MIE
 
 #endif
