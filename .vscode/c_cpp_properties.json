@@ -1,0 +1,65 @@
+{
+  "configurations": [
+    {
+      "name": "Linux-CUP-QuasiStatic",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/modules",
+        "${workspaceFolder}/modules/cup",
+        "${default}",
+        "/usr/include/eigen3"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}/include",
+          "${workspaceFolder}/modules",
+          "${workspaceFolder}/modules/cup",
+          "${workspaceFolder}"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "forcedInclude": [
+        "${workspaceFolder}/.vscode/cup_intellisense_qs.hpp"
+      ],
+      "cStandard": "c17",
+      "cppStandard": "gnu++17",
+      "intelliSenseMode": "linux-gcc-x64",
+      "compilerPath": "/usr/bin/g++-13",
+      "compilerArgs": [
+        "-DUSE_MYBESSEL_BL"
+      ],
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+    },
+    {
+      "name": "Linux-CUP-MIE",
+      "includePath": [
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/modules",
+        "${workspaceFolder}/modules/cup",
+        "${default}",
+        "/usr/include/eigen3"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}/include",
+          "${workspaceFolder}/modules",
+          "${workspaceFolder}/modules/cup",
+          "${workspaceFolder}"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      },
+      "forcedInclude": [
+        "${workspaceFolder}/.vscode/cup_intellisense_mie.hpp"
+      ],
+      "cStandard": "c17",
+      "cppStandard": "gnu++17",
+      "intelliSenseMode": "linux-gcc-x64",
+      "compilerPath": "/usr/bin/g++-13",
+      "compilerArgs": [
+        "-DUSE_MYBESSEL_BL"
+      ],
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json"
+    }
+  ],
+  "version": 4
+}
