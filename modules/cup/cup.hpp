@@ -69,7 +69,12 @@ public:
     }
 
     // --- Materials / permittivities (definitions in cup/materials.H) ---
-    void set_metal(const char* mtl, const char* mdl, int sel = 0);
+    //     db is optional and currently only used for silver spline data.
+    //       Supported values:
+    //         nullptr / "jc"  -> legacy Johnson-Christy spline table
+    //         "unical"        -> alternative Unical silver spline table
+
+    void set_metal(const char* mtl, const char* mdl, int sel = 0, const char* db = nullptr);
     double set_host(const char* hst);
     void set_active(const char* mod);
     std::complex<double> metal(double ome);

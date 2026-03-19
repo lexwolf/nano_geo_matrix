@@ -33,13 +33,17 @@ inline std::filesystem::path ngm_cup_materials_dir()
     return fs::weakly_canonical(dir);
 }
 
-inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, int sel)
+inline void nanosphere::set_metal(const char* mtl_cstr,
+                                  const char* mdl_cstr,
+                                  int sel,
+                                  const char* db_cstr)
 {
     namespace fs = std::filesystem;
     using std::string_view;
 
     const string_view mtl = (mtl_cstr != nullptr) ? string_view{mtl_cstr} : string_view{};
     const string_view mdl = (mdl_cstr != nullptr) ? string_view{mdl_cstr} : string_view{};
+    const string_view db  = (db_cstr  != nullptr) ? string_view{db_cstr}  : string_view{};
 
     // store selection:
     // -1: LOW (Re-Dr, Im-Di), 0: BASE, +1: HIGH (Re+Dr, Im+Di)
@@ -81,6 +85,26 @@ inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, in
         "drude, spline"
     };
 
+    auto resolve_spline_file = [&](const metal_spec& spec) -> fs::path {
+        if (spec.name == "silver") {
+            if (db.empty() || db == "jc") {
+                return ngm_cup_materials_dir() / "silverJCeV.dat";
+            }
+            if (db == "unical") {
+                return ngm_cup_materials_dir() / "silverUNICALeV.dat";
+            }
+
+            fail("unknown database '" + std::string(db) +
+                 "' for silver. Options are: jc, unical");
+        }
+
+        if (!db.empty()) {
+            warn("database selection ignored for metal '" + std::string(spec.name) + "'");
+        }
+
+        return ngm_cup_materials_dir() / spec.jc_filename;
+    };
+
     const metal_spec* spec = nullptr;
 
     if (mtl == "gold") {
@@ -103,21 +127,34 @@ inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, in
     if (mdl == "drude") {
         if (sel != 0) {
             warn(
-                "'drude' model does not support JC uncertainty "
+                "'drude' model does not support spline uncertainty selection "
                 "(sel=" + std::to_string(sel) + "). Ignoring uncertainty selection."
+            );
+        }
+        if (!db.empty()) {
+            warn(
+                "'drude' model does not use tabulated databases "
+                "(db='" + std::string(db) + "'). Ignoring database selection."
             );
         }
     }
     else if (mdl == "spline") {
         spln = 1;
 
-        const fs::path jcfile = ngm_cup_materials_dir() / spec->jc_filename;
+        const fs::path datafile = resolve_spline_file(*spec);
 
-        std::ifstream inp(jcfile);
+        if (spec->name == "silver" && db == "unical" && sel != 0) {
+            warn(
+                "'unical' silver database does not provide uncertainty columns; "
+                "sel=" + std::to_string(sel) + " has no effect."
+            );
+        }
+
+        std::ifstream inp(datafile);
         if (!inp) {
-            std::cerr << "Error: could not open " << jcfile << '\n'
-                    << "__FILE__ = " << __FILE__ << '\n'
-                    << "cwd      = " << fs::current_path() << '\n';
+            std::cerr << "Error: could not open " << datafile << '\n'
+                      << "__FILE__ = " << __FILE__ << '\n'
+                      << "cwd      = " << fs::current_path() << '\n';
             std::exit(EXIT_FAILURE);
         }
 
@@ -142,16 +179,28 @@ inline void nanosphere::set_metal(const char* mtl_cstr, const char* mdl_cstr, in
             }
         }
 
+        if (omem_vec.size() >= 2 && omem_vec.front() > omem_vec.back()) {
+            std::reverse(omem_vec.begin(), omem_vec.end());
+            std::reverse(reps_vec.begin(), reps_vec.end());
+            std::reverse(ieps_vec.begin(), ieps_vec.end());
+        }
+
+        for (std::size_t i = 1; i < omem_vec.size(); ++i) {
+            if (omem_vec[i] <= omem_vec[i - 1]) {
+                fail("spline x-grid is not strictly increasing in file: " + datafile.string());
+            }
+        }
+
         rows = static_cast<int>(omem_vec.size());
         if (rows == 0) {
-            fail("empty JC file: " + jcfile.string());
+            fail("empty spline file: " + datafile.string());
         }
 
         omem = new double[rows];
         double* reps = new double[rows];
         double* ieps = new double[rows];
 
-        for (std::size_t i = 0; i < rows; ++i) {
+        for (std::size_t i = 0; i < omem_vec.size(); ++i) {
             omem[i] = omem_vec[i];
             reps[i] = reps_vec[i];
             ieps[i] = ieps_vec[i];
