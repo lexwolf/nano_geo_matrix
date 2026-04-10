@@ -39,16 +39,27 @@ struct ExtFeature   { double w_min_ext, Rea_at_min; };
 #endif
 
 class nanosphere{
-    gsl_interp_accel *acc;
-    gsl_interp_accel *ach;
-    gsl_spline *reeps;
-    gsl_spline *imeps;
-    gsl_spline *reeph;
-    gsl_spline *imeph;
-    double *omem;
+    gsl_interp_accel *acc = nullptr;
+    gsl_interp_accel *ach = nullptr;
+    gsl_spline *reeps = nullptr;
+    gsl_spline *imeps = nullptr;
+    gsl_spline *reeph = nullptr;
+    gsl_spline *imeph = nullptr;
+    double *omem = nullptr;
     size_t rows = 0;
-    int spln;
-    char *wrk;
+    int spln = 0;
+    double *d_omem = nullptr;
+    size_t d_rows = 0;
+    int d_spln = 0;
+    gsl_interp_accel *d_acc = nullptr;
+    gsl_spline *d_reeps = nullptr;
+    gsl_spline *d_imeps = nullptr;
+    std::complex<double> eps_d_const = {1.0, 0.0};
+    bool dielectric_is_tabulated = false;
+    char *wrk = nullptr;
+
+    void clear_metal_spline_state();
+    void clear_dielectric_spline_state();
 
 public:
     std::complex<double> img;
@@ -69,10 +80,29 @@ public:
     }
 
     // --- Materials / permittivities (definitions in cup/materials.H) ---
-    void set_metal(const char* mtl, const char* mdl, int sel = 0);
+
+    // Metal permittivity:
+    // - spline-backed silver supports db = nullptr/"jc" and "unical"
+    // - other tabulated metals currently ignore database selection
+    void set_metal(const char* mtl, const char* mdl, int sel = 0, const char* db = nullptr);
+
+    // Tabulated dielectric permittivity:
+    // - currently supports "glass" and "ito"
+    // - database selection currently supports db = nullptr/"unical"
+    // TODO:
+    // Existing quasi-static / Mie solver paths may still use constant host dielectric
+    // values via legacy mechanisms. Evaluate case by case whether they should be
+    // upgraded to call dielectric(ome) for dispersive dielectric support.
+    void set_dielectric(const char* mat, const char* mdl = "spline", const char* db = nullptr);
+
+    // Legacy constant host dielectric path.
+    // Kept unchanged for backward compatibility with existing solver code.
     double set_host(const char* hst);
+
     void set_active(const char* mod);
+
     std::complex<double> metal(double ome);
+    std::complex<double> dielectric(double ome);
     std::complex<double> confinement(double ome);
     std::complex<double> active(double ome, double epsh);
     std::complex<double> set_GamG(double G, double tau2);
