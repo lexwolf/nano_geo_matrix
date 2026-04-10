@@ -41,3 +41,19 @@ target_include_directories(ngm_cup_mie_module_smoke PRIVATE
 )
 target_link_libraries(ngm_cup_mie_module_smoke PRIVATE nano_geo_matrix)
 add_test(NAME ngm_cup_mie_module_smoke COMMAND ngm_cup_mie_module_smoke)
+
+add_executable(ngm_metal_database_test metal_database_test.cpp)
+target_include_directories(ngm_metal_database_test PRIVATE
+    ${PROJECT_SOURCE_DIR}/modules/cup
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(ngm_metal_database_test PRIVATE nano_geo_matrix)
+add_test(NAME ngm_metal_database_test COMMAND ngm_metal_database_test)
+
+add_executable(ngm_dielectric_database_test dielectric_database_test.cpp)
+target_include_directories(ngm_dielectric_database_test PRIVATE
+    ${PROJECT_SOURCE_DIR}/modules/cup
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(ngm_dielectric_database_test PRIVATE nano_geo_matrix)
+add_test(NAME ngm_dielectric_database_test COMMAND ngm_dielectric_database_test)
