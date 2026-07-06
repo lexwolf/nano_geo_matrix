@@ -443,6 +443,7 @@ double *ISS_results(nanosphere ns, double Ome, double ome1, double ome2, double 
         cq0s.imag(0);
         } else cq0s = 1./xi.imag()+tau1*(OmeH-img*Ome)/(GG*xi*xi.imag());
     
+    q0s = cq0s.real();
     if (fabs(cq0s.imag())>5.e-5 && fabs(ns.G) > fabs(fro[1])){
         std::cout.precision(20);
         std::cout<<"> Warning! The error on the imaginary part of |q1|² is larger than 5.e-5"
@@ -454,7 +455,7 @@ double *ISS_results(nanosphere ns, double Ome, double ome1, double ome2, double 
             <<std::endl<<"> err = "<<cq0s.imag()<<std::endl;
             std::cout<<"> ome ="<<omeeV<<", Ome = "<<Ome<<std::endl;
             exit(-67); 
-            } else q0s = cq0s.real();
+            }
     
     res[0] = q0s;
     res[1] = q0s*norm(gam1);
