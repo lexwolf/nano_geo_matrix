@@ -193,14 +193,14 @@ std::vector<std::pair<double,std::complex<double>>> gimme_emi_kap(nanosphere ns,
         ome_g = nv[3];
         GG   = ns.set_GamG(ns.G, tau2);
 
-        p0 = pcfc0(ns.eps_inf, eps_b, eps_s, rho);
-        p1 = pcfc1(ns.eps_inf, eps_b, eps_s, rho);
-        p2 = pcfc2(ns.eps_inf, eps_b, eps_s, rho);
-        
         for (omi=0; omi<=omeN; omi++){
             omeeV = omemi + omi*dome;
         
             ome  = omeeV/ns.Ome_p;
+            ns.metal(omeeV);
+            p0 = pcfc0(ns.ceps_inf, eps_b, eps_s, rho);
+            p1 = pcfc1(ns.ceps_inf, eps_b, eps_s, rho);
+            p2 = pcfc2(ns.ceps_inf, eps_b, eps_s, rho);
 
             odv  = ns.set_ome_dep_vrbls(ome, ome_g, tau2, gamd);
             OmeH = odv[0];
@@ -268,9 +268,10 @@ double find_Omega(nanosphere ns, double omeeV, char* hst, char* sol=0, double rh
     OmeP = odv[1];
     GamP = odv[2];
     
-    p0 = pcfc0(ns.eps_inf, eps_b, eps_s, rho);
-    p1 = pcfc1(ns.eps_inf, eps_b, eps_s, rho);
-    p2 = pcfc2(ns.eps_inf, eps_b, eps_s, rho);
+    ns.metal(omeeV);
+    p0 = pcfc0(ns.ceps_inf, eps_b, eps_s, rho);
+    p1 = pcfc1(ns.ceps_inf, eps_b, eps_s, rho);
+    p2 = pcfc2(ns.ceps_inf, eps_b, eps_s, rho);
 
     A   = coefficients(OmeH, OmeP, GG, GamP, p0, p1, p2);
         
@@ -426,10 +427,11 @@ double *ISS_results(nanosphere ns, double Ome, double ome1, double ome2, double 
     OmeP = odv[1];
     GamP = odv[2];
     
-    p0 = pcfc0(ns.eps_inf, eps_b, eps_s, rho);
-    p1 = pcfc1(ns.eps_inf, eps_b, eps_s, rho);
-    p2 = pcfc2(ns.eps_inf, eps_b, eps_s, rho);
-    p3 = pcfc3(ns.eps_inf, eps_b, eps_s, rho);
+    ns.metal(omeeV);
+    p0 = pcfc0(ns.ceps_inf, eps_b, eps_s, rho);
+    p1 = pcfc1(ns.ceps_inf, eps_b, eps_s, rho);
+    p2 = pcfc2(ns.ceps_inf, eps_b, eps_s, rho);
+    p3 = pcfc3(ns.ceps_inf, eps_b, eps_s, rho);
 
     A   = coefficients(OmeH, OmeP, GG, GamP, p0, p1, p2);
 
