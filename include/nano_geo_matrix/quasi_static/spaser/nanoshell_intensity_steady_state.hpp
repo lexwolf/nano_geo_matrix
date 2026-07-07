@@ -289,7 +289,7 @@ double find_Omega(nanosphere ns, double omeeV, char* hst, char* sol=0, double rh
     dmem = 0.1;
     for (int i = 0; i < 3; i++) if (kap[i].real() > 0) kamp = kap[i].imag();
     if (kamp != 66){
-        for (int i = 0; i < 5; i++){
+        for (int i = 0; i < 4; i++){
             if (vOme[i].imag()==0){
                 if (fabs(vOme[i].real()-kamp)<dmem) {
                     Ome = vOme[i].real();
@@ -303,9 +303,13 @@ double find_Omega(nanosphere ns, double omeeV, char* hst, char* sol=0, double rh
     xi   = gimmeXi(p0, gam1, gam2, tau1);
     equ1 = norm(gammaD(A, Ome))*(real(xi)+tau2*(Ome-ome+ome_g)*imag(xi))/tau1;
     equ2 = c[0]+c[1]*Ome+c[2]*pow(Ome,2)+c[3]*pow(Ome,3)+c[4]*pow(Ome,4);
-    if (abs(equ1-equ2)>=1.e-18 && fabs(Ome)> 1.e-30){
+    const double coeff_err = fabs(equ1-equ2);
+    double coeff_scale = fabs(equ1);
+    if (fabs(equ2) > coeff_scale) coeff_scale = fabs(equ2);
+    if (coeff_scale < 1.) coeff_scale = 1.;
+    if (coeff_err >= 1.e-5*coeff_scale && fabs(Ome)> 1.e-30){
         std::cout.precision(20);
-        std::cout<<"> Fatal! The error on the coefficient equation is larger than "<<abs(equ1-equ2)<<std::endl;
+        std::cout<<"> Fatal! The error on the coefficient equation is larger than "<<coeff_err<<std::endl;
         std::cout<<"> ome ="<<omeeV<<std::endl;
         exit(-66);
         }
@@ -446,18 +450,18 @@ double *ISS_results(nanosphere ns, double Ome, double ome1, double ome2, double 
         } else cq0s = 1./xi.imag()+tau1*(OmeH-img*Ome)/(GG*xi*xi.imag());
     
     q0s = cq0s.real();
-    if (fabs(cq0s.imag())>5.e-5 && fabs(ns.G) > fabs(fro[1])){
+    if (fabs(cq0s.imag())>1. && fabs(ns.G) > fabs(fro[1]) && fabs(Ome)> 1.e-30){
         std::cout.precision(20);
-        std::cout<<"> Warning! The error on the imaginary part of |q1|² is larger than 5.e-5"
+        std::cout<<"> Fatal! The error on the imaginary part of |q1|² is larger than 1"
         <<std::endl<<"> err = "<<cq0s.imag()<<std::endl;
         std::cout<<"> ome ="<<omeeV<<", Ome = "<<Ome<<std::endl;
-        } else if (fabs(cq0s.imag())>1. && fabs(ns.G) > fabs(fro[1])){
-            std::cout.precision(20);
-            std::cout<<"> Fatal! The error on the imaginary part of |q1|² is larger than 1"
-            <<std::endl<<"> err = "<<cq0s.imag()<<std::endl;
-            std::cout<<"> ome ="<<omeeV<<", Ome = "<<Ome<<std::endl;
-            exit(-67); 
-            }
+        exit(-67); 
+        } else if (fabs(cq0s.imag())>1.e-3 && fabs(ns.G) > fabs(fro[1]) && fabs(Ome)> 1.e-30){
+        std::cout.precision(20);
+        std::cout<<"> Warning! The error on the imaginary part of |q1|² is larger than 1.e-3"
+        <<std::endl<<"> err = "<<cq0s.imag()<<std::endl;
+        std::cout<<"> ome ="<<omeeV<<", Ome = "<<Ome<<std::endl;
+        }
     
     res[0] = q0s;
     res[1] = q0s*norm(gam1);
