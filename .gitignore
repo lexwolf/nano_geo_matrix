@@ -9,3 +9,6 @@
 *.mod
 *.MOD
 build/
+
+# KDE/Dolphin folder metadata
+.directory
