@@ -27,6 +27,7 @@
 #else
 
 #include "../pump.hpp"
+#include "../stopping_arithmetic.hpp"
 
 #ifdef h
 #pragma push_macro("h")
@@ -507,19 +508,22 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
         }
 
         if (t_ps > 2.*tpump) {
-            if (steste == 1 && fabs((norm(dip)-dnormem)/norm(dip)) < 1.e-30) break;
-            if (fabs((norm(dip)-dnormem)/norm(dip)) < 1.e-10) wb = 1;
+            if (steste == 1 && cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-30)) break;
+            if (cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-10)) wb = 1;
 
-            if (wb == 1) wave.push_back(q[0]);
+            if (wb == 1 && cup_stopping_detail::finite_positive(norm(dip)) &&
+                std::isfinite(dnormem)) wave.push_back(q[0]);
 
-            if (steste == 1 && dnavr != 0.0 && fabs((dnavr-dnavrm)/dnavr) < 1.e-7) break;
+            cup_stopping_detail::invalidate_average_if_needed(
+                omeR, t-t0, dpTOT + norm(dip), dnavr, dnavrm);
+
+            if (steste == 1 && cup_stopping_detail::relative_change_below(dnavr, dnavrm, 1.e-7)) break;
 
             if (AVE == 0) { t0 = t; AVE = 1; }
             dpTOT += norm(dip);
 
-            if (t - t0 >= 1000/omeR) {
-                dnavrm = dnavr;
-                dnavr  = dpTOT / (t - t0);
+            if (cup_stopping_detail::averaging_window_complete(omeR, t-t0)) {
+                cup_stopping_detail::store_average(dpTOT, t-t0, dnavr, dnavrm);
                 AVE = 0;
                 dpTOT = 0;
             }
@@ -723,9 +727,9 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<N<<            // 8 Im(q2)
 					std::endl;
 				}
-			if (amp == 1 && norm(dip)/E0 > 5.e26 && steste == 1) break;
+			if (amp == 1 && steste == 1 && cup_stopping_detail::amplitude_above(norm(dip), E0, 5.e26)) break;
 			if (amp == 0 && t_ps>2.*tpump) 
-				if (fabs((norm(dip)-dnormem)/norm(dip)) < 1.e-20 && steste == 1) break;
+				if (steste == 1 && cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-20)) break;
 		    }
 
 		free_evec(EVE, 3);   // deletes EVE rows + EVE

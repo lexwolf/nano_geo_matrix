@@ -22,6 +22,7 @@
 #else
 
 #include "../pump.hpp"
+#include "../stopping_arithmetic.hpp"
 #include <filesystem>
 
 // includes
@@ -615,19 +616,21 @@ inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* m
 			}
 
 			if (t_ps > 2.*tpump){
-				if (fabs((norm(aj)-dnormem)/norm(aj)) < 1.e-20 && steste==1) break;
+				if (steste == 1 && cup_stopping_detail::relative_change_below(norm(aj), dnormem, 1.e-20)) break;
 
-				if (fabs((norm(aj)-dnormem)/norm(aj)) < 1.e-10) wave.push_back(q[0]);
+				if (cup_stopping_detail::relative_change_below(norm(aj), dnormem, 1.e-10)) wave.push_back(q[0]);
 
-				if (fabs((dnavr-dnavrm)/dnavr) < 1.e-6 && steste==1) break;
+				omeR = Rabi_frec(G*N, tau2, E0);
+				cup_stopping_detail::invalidate_average_if_needed(
+					omeR, t-t0, dpTOT + norm(aj), dnavr, dnavrm);
+
+				if (steste == 1 && cup_stopping_detail::relative_change_below(dnavr, dnavrm, 1.e-6)) break;
 
 				if (AVE==0){ t0=t; AVE=1; }
 				dpTOT += norm(aj);
 
-				omeR = Rabi_frec(G*N, tau2, E0);
-				if (t-t0 >= 1000/omeR){
-					dnavrm=dnavr;
-					dnavr=dpTOT/(t-t0);
+				if (cup_stopping_detail::averaging_window_complete(omeR, t-t0)){
+					cup_stopping_detail::store_average(dpTOT, t-t0, dnavr, dnavrm);
 					AVE=0;
 					dpTOT =0;
 				}
@@ -889,10 +892,10 @@ inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* 
 					<<"\n";
 			}
 
-			if (amp==1 && norm(aj)/E0 > 5.e26 && steste==1) break;
+			if (amp==1 && steste == 1 && cup_stopping_detail::amplitude_above(norm(aj), E0, 5.e26)) break;
 
 			if (amp==0 && t_ps > 2.*tpump)
-				if (fabs((norm(aj)-dnormem)/norm(aj)) < 1.e-20 && steste==1) break;
+				if (steste == 1 && cup_stopping_detail::relative_change_below(norm(aj), dnormem, 1.e-20)) break;
 		}
 
 		// --- cleanup ---------------------------------------------------------
