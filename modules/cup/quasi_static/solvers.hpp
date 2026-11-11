@@ -28,6 +28,7 @@
 
 #include "../pump.hpp"
 #include "../stopping_arithmetic.hpp"
+#include "../automatic_output.hpp"
 
 #ifdef h
 #pragma push_macro("h")
@@ -334,7 +335,12 @@ inline std::vector<std::pair<double,std::complex<double>>>  nanosphere::steady_s
 
 inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hst,
                                double E0, double omeeV, double T, double tpump,
-                               char* sol, double rho, const char* pump_md, bool evolve_N, const char* output) {
+                               char* sol, double rho, const char* pump_md, bool evolve_N, const char* output, double automatic_output_interval_ps){
+    const double omep = eV2j*Ome_p*2.*M_PI/h;  // angular frequency (rad/s): Ep/hbar
+    // All four time-dependent routines integrate with normalized dt=1.
+    const auto output_cadence = T == 0
+        ? cup_output_detail::automatic_cadence(automatic_output_interval_ps, omep, 1.)
+        : cup_output_detail::Cadence{};
 
     constexpr int Nsys = 3;
 	PumpMode pm = pump_mode(pump_md);
@@ -349,7 +355,7 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 
     int steste = 0;
     std::complex<double> eps1e, eps2e, alph;
-    double omep, t, t_ps, tau1, tau2, gamd, ome_g, pG = fabs(G), tildeN;
+    double t, t_ps, tau1, tau2, gamd, ome_g, pG = fabs(G), tildeN;
 
     // NOTE: GamG is constant, the N dependence enters via GamG * N
     std::complex<double> GamG, OmeG, GamM, OmeM, chiH, chiP;
@@ -396,8 +402,6 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
          << "# t (ps)\treal(q0)\timag(q0)\treal(q1)\timag(q1)\treal(q2)\timag(q2)\n#\n";
 
     // --- Setup ---
-    omep = eV2j * Ome_p * 2. * M_PI / h;
-
     nv = normalized_variables();     // returns new double[4]
     tau1 = nv[0];
     tau2 = nv[1];
@@ -438,6 +442,11 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
     int Nprint_max = 50000;                 // keep your original numerical cap
     int iprint = std::max(1, Nt / Nprint_max);
 
+    if (steste == 1) {
+        iprint = output_cadence.steps;
+        cup_output_detail::write_metadata({&dyna, &fnct}, automatic_output_interval_ps, output_cadence);
+    }
+
     // Helper to build A,B for current N
     auto rebuild_AB = [&](double N_now) {
         // free old
@@ -458,7 +467,34 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 
 	int i = 0;
 
-	while (i <= Nt) {
+    int last_written_step = -1;
+    const char* termination_reason = "maximum_duration_exhaustion";
+    const auto write_state = [&]() {
+        dyna << "  " << std::setw(8) << std::setiosflags(std::ios::left) << t_ps
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(alph)
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(alph)
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(dip)
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(dip)
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << N
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(dip - E0)
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(dip - E0)
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left)
+             << joule_heating(g.ns, ome, (dip - E0), q[2])
+             << "\n";
+
+        fnct << "  " << std::setw(8) << std::setiosflags(std::ios::left) << t_ps
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(q[0])
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(q[0])
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(q[1])
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(q[1])
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(q[2])
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(q[2])
+             << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << N
+             << "\n";
+        last_written_step = i-1;
+    };
+
+    while (i <= Nt) {
 		t = i * dt;
 		t_ps = t * 1.e+12 / omep; // time in picoseconds
 		i++;
@@ -483,32 +519,14 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 		dip  = numerical_output(E0, q, p);
 		alph = dip / E0;
 
-        if (i % iprint == 0) {
-            dyna << "  " << std::setw(8) << std::setiosflags(std::ios::left) << t_ps
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(alph)
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(alph)
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(dip)
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(dip)
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << N
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(dip - E0)
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(dip - E0)
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left)
-                 << joule_heating(g.ns, ome, (dip - E0), q[2])
-                 << "\n";
-
-            fnct << "  " << std::setw(8) << std::setiosflags(std::ios::left) << t_ps
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(q[0])
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(q[0])
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(q[1])
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(q[1])
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(q[2])
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << imag(q[2])
-                 << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << N
-                 << "\n";
-        }
+        if (steste == 1 ? cup_output_detail::scheduled(i-1, iprint) : i%iprint == 0)
+            write_state();
 
         if (t_ps > 2.*tpump) {
-            if (steste == 1 && cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-30)) break;
+            if (steste == 1 && cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-30)) {
+                termination_reason = "existing_instantaneous_intensity_convergence";
+                break;
+            }
             if (cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-10)) wb = 1;
 
             if (wb == 1 && cup_stopping_detail::finite_positive(norm(dip)) &&
@@ -517,7 +535,10 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
             cup_stopping_detail::invalidate_average_if_needed(
                 omeR, t-t0, dpTOT + norm(dip), dnavr, dnavrm);
 
-            if (steste == 1 && cup_stopping_detail::relative_change_below(dnavr, dnavrm, 1.e-7)) break;
+            if (steste == 1 && cup_stopping_detail::relative_change_below(dnavr, dnavrm, 1.e-7)) {
+                termination_reason = "existing_block_average_convergence";
+                break;
+            }
 
             if (AVE == 0) { t0 = t; AVE = 1; }
             dpTOT += norm(dip);
@@ -532,6 +553,11 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
         if (wave.size() >= 150000) {
             wave.erase(wave.begin(), wave.begin() + 50000);
         }
+    }
+
+    if (steste == 1) {
+        if (last_written_step != i-1) write_state();
+        cup_output_detail::write_termination({&dyna, &fnct}, termination_reason);
     }
 
     if (g.is_shell) {
@@ -560,7 +586,13 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 
 inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* hst,
 								double E0, double omeeV, double T, double tpump,
-								char* sol, double rho, const char* output){
+								char* sol, double rho, const char* output, double automatic_output_interval_ps){
+		const double omep = eV2j*Ome_p*2.*M_PI/h;  // angular frequency (rad/s): Ep/hbar
+		// All four time-dependent routines integrate with normalized dt=1.
+		const auto output_cadence = T == 0
+		    ? cup_output_detail::automatic_cadence(automatic_output_interval_ps, omep, 1.)
+		    : cup_output_detail::Cadence{};
+
 		constexpr int Nsys = 3;
 
 		const auto g = cup_qs_detail::make_geometry_context(*this, hst, sol, rho);
@@ -569,7 +601,7 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 		double ome, dt, dnormem=1.e20;
 		int steste=0, amp=0;
 		std::complex<double> eps1e, eps2e, eps1, eps2, alph;
-		double omep, t, t_ps, tau1, tau2, gamd, ome_g, pG = fabs(G), *nv, N, tildeN;
+		double t, t_ps, tau1, tau2, gamd, ome_g, pG = fabs(G), *nv, N, tildeN;
 		std::complex<double> GamGxN, OmeG, chiH, GamM, OmeM, chiP, *p0, *p1, *p2, *p3, *p, *q, *odv;
 		
 		std::complex<double> dip = {0.0, 0.0};
@@ -641,7 +673,6 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 		fnct<<"# t (ps)\treal(q0)\timag(q0)\treal(q1)\timag(q1)\treal(q2)\timag(q2)"<<std::endl;
 		fnct<<"#"<<std::endl;
 
-		omep = eV2j*Ome_p*2.*M_PI/h;// omep = eV2j*Ome_p/h;  //converto in Hz
 		// normalized variables
 		nv = normalized_variables ();
 		tau1 = nv[0];
@@ -659,7 +690,7 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 		
 			
 		odv  = set_ome_dep_vrbls(ome, ome_g, tau2, gamd);
-		
+
 		OmeG = odv[0];
 		OmeM = odv[1];
 		GamM = odv[2];
@@ -675,6 +706,11 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 		int Nprint_max = 500000;
 		int iprint = std::max(1, Nt / Nprint_max);
 
+		if (steste == 1) {
+		    iprint = output_cadence.steps;
+		    cup_output_detail::write_metadata({&dyna, &fnct}, automatic_output_interval_ps, output_cadence);
+		}
+
 		// let's begin without pump
 		tildeN = 0.0;
 		N      = tildeN;
@@ -683,6 +719,27 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 		C = find_constants(EVE, qss, q, 3);
 		double t0 = 0.;
 		int i=0, pip=0;
+		int last_written_step = -1;
+		const char* termination_reason = "maximum_duration_exhaustion";
+		const auto write_state = [&]() {
+			dyna<<"  "<<std::setw(8)<<std::setiosflags (std::ios::left)<<t_ps<<   // 1 time (ps)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(alph)<<   // 2 Re(alpha)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(alph)<<   // 3 Im(alpha)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(dip)<<    // 4 Re(dip)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(dip)<<    // 5 Im(dip)
+			    std::endl;
+			fnct<<"  "<<std::setw(8)<<std::setiosflags (std::ios::left)<<t_ps<<   // 1 time (ps)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(q[0])<<   // 2 Re(q0)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(q[0])<<   // 3 Im(q0)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(q[1])<<   // 4 Re(q1)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(q[1])<<   // 5 Im(q1)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(q[2])<<   // 6 Re(q2)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(q[2])<<   // 7 Im(q2)
+			    "\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<N<<            // 8 Im(q2)
+			    std::endl;
+			last_written_step = i-1;
+		};
+
 		while (i<=Nt){
 		    t=i*dt;
 		    t_ps = t * 1.e+12 / omep; // time in picoseconds
@@ -709,28 +766,24 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 		    dnormem = steste*norm(dip);
 		    dip = numerical_output(E0, q, p);
 		    alph = dip/E0;
-		    
-		    if(i%iprint==0){
-				dyna<<"  "<<std::setw(8)<<std::setiosflags (std::ios::left)<<t_ps<<   // 1 time (ps)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(alph)<<   // 2 Re(alpha)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(alph)<<   // 3 Im(alpha)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(dip)<<    // 4 Re(dip)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(dip)<<    // 5 Im(dip)
-					std::endl;
-				fnct<<"  "<<std::setw(8)<<std::setiosflags (std::ios::left)<<t_ps<<   // 1 time (ps)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(q[0])<<   // 2 Re(q0)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(q[0])<<   // 3 Im(q0)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(q[1])<<   // 4 Re(q1)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(q[1])<<   // 5 Im(q1)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<real(q[2])<<   // 6 Re(q2)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<imag(q[2])<<   // 7 Im(q2)
-					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<N<<            // 8 Im(q2)
-					std::endl;
-				}
-			if (amp == 1 && steste == 1 && cup_stopping_detail::amplitude_above(norm(dip), E0, 5.e26)) break;
+
+			if (steste == 1 ? cup_output_detail::scheduled(i-1, iprint) : i%iprint == 0)
+				write_state();
+			if (amp == 1 && steste == 1 && cup_stopping_detail::amplitude_above(norm(dip), E0, 5.e26)) {
+				termination_reason = "amplitude_cutoff";
+				break;
+			}
 			if (amp == 0 && t_ps>2.*tpump) 
-				if (steste == 1 && cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-20)) break;
+				if (steste == 1 && cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-20)) {
+					termination_reason = "existing_instantaneous_intensity_convergence";
+					break;
+				}
 		    }
+
+		if (steste == 1) {
+		    if (last_written_step != i-1) write_state();
+		    cup_output_detail::write_termination({&dyna, &fnct}, termination_reason);
+		}
 
 		free_evec(EVE, 3);   // deletes EVE rows + EVE
 		delete[] kap;

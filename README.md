@@ -209,6 +209,31 @@ The module then:
 
 ---
 
+### Time-dependent automatic output
+
+The CUP `numerical` and `analytical` routines in both backends accept a final
+optional `double automatic_output_interval_ps = 0.1` argument after `output`.
+It applies only to automatic mode (`T == 0`); positive fixed durations retain
+their existing cadence and row schedule, and ignore this argument.
+
+Automatic intervals must be finite and strictly positive. They round upward
+to whole integration steps, with at least one step, using the angular plasma
+frequency `Ep/hbar`. Invalid values throw `std::invalid_argument`; intervals
+outside the integer step-count or recorded interval range throw
+`std::overflow_error` before the run starts. Output starts at the first rounded
+interval and samples the full run regularly. Each file records the requested
+and actual intervals in ps, the step count, and the rounding rule as comments.
+
+The final computed state is always saved in automatic mode, without duplicating
+a scheduled row. Its timestamp follows the existing solver convention (the
+loop's timestamp index before increment, including for the numerical update).
+A final comment identifies the existing instantaneous-intensity convergence,
+block-average convergence, amplitude cutoff, or maximum-duration exhaustion.
+These are the existing convergence tests, not a sustained steady-state detector.
+Output spacing does not change convergence checks, Fourier collection, or the
+100,000 ps automatic ceiling. At the default interval, that ceiling permits
+approximately one million scheduled rows per file, plus a terminal row.
+
 ### Design philosophy
 
 The CUP module intentionally trades some of the minimalism of the

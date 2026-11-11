@@ -148,16 +148,19 @@ public:
                  double omemi, double omema, int omeN=10000, char* sol=0, double rho=0,
                  const char* output = "../data/output");
 
+    // For T==0 only: output interval in ps, rounded up to whole dt=1 steps.
     std::complex<double>
     numerical(char* mdl, char* mtl, char* hst,
               double E0, double omeeV, double T, double tpump,
               char* sol=0, double rho=0, const char* pump_md="step", bool evolve_N=true,
-              const char* output = "../data/output");
+              const char* output = "../data/output",
+              double automatic_output_interval_ps = 0.1);
 
     std::complex<double>
     analytical(char* mdl , char* mtl ,char* hst,
                double E0, double omeeV, double T, double tpump,
-               char* sol=0, double rho=0, const char* output = "../data/output");
+               char* sol=0, double rho=0, const char* output = "../data/output",
+               double automatic_output_interval_ps = 0.1);
 #endif
 
 #ifdef CUP_BACKEND_MIE
@@ -200,16 +203,19 @@ public:
                  double omemi, double omema, int omeN=10000, char* sol=0, double rho=0,
                  const char* output = "../data/output");
 
+    // For T==0 only: output interval in ps, rounded up to whole dt=1 steps.
     std::complex<double>
     numerical(int order, char* mdl , char* mtl ,char* hst,
               double E0, double omeeV, double T, double tpump,
               char* sol=0, double rho=0, const char* pump_md="step", bool evolve_N=true,
-              const char* output = "../data/output");
+              const char* output = "../data/output",
+              double automatic_output_interval_ps = 0.1);
 
     std::complex<double>
     analytical(int order, char* mdl , char* mtl ,char* hst,
                double E0, double omeeV, double T, double tpump,
-               char* sol=0, double rho=0, const char* output = "../data/output");
+               char* sol=0, double rho=0, const char* output = "../data/output",
+               double automatic_output_interval_ps = 0.1);
 
 #endif
 }; // class nanosphere

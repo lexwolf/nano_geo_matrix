@@ -69,8 +69,8 @@ int main()
     ok = ok && first_crossing > 0. && first_crossing < duration - cadence;
     const auto automatic = run(0.);
     const double cutoff_value = std::norm(automatic)/field;
-    // Automatic output can be empty: its existing sampling interval exceeds
-    // the cutoff time. The returned state must be just beyond the amplitude gate.
+    // The returned state must remain just beyond the existing amplitude gate,
+    // independently of the automatic output cadence.
     ok = ok && std::isfinite(cutoff_value) && cutoff_value > 5.e26 &&
          cutoff_value < 6.e26;
     std::cout << "fixed endpoint=" << last << " ps, rows=" << rows
