@@ -517,7 +517,7 @@ inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* m
 		};
 
 		// --- physics setup ---------------------------------------------------
-		omep = eV2j*Ome_p/h;  // Hz
+		omep = eV2j*Ome_p*2.*M_PI/h;  // angular frequency (rad/s): Ep/hbar
 
 		nv   = normalized_variables();
 		tau1 = nv[0];
@@ -778,7 +778,7 @@ inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* 
 		};
 
 		// --- setup -----------------------------------------------------------
-		omep = eV2j*Ome_p/h;  // Hz
+		omep = eV2j*Ome_p*2.*M_PI/h;  // angular frequency (rad/s): Ep/hbar
 
 		nv   = normalized_variables();
 		tau2 = nv[1];
