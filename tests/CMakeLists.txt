@@ -18,6 +18,14 @@ target_include_directories(ngm_cup_qs_smoke PRIVATE
 )
 add_test(NAME ngm_cup_qs_smoke COMMAND ngm_cup_qs_smoke)
 
+add_executable(ngm_cup_qs_analytical_duration_test cup_qs_analytical_duration_test.cpp)
+target_link_libraries(ngm_cup_qs_analytical_duration_test PRIVATE nano_geo_matrix)
+target_include_directories(ngm_cup_qs_analytical_duration_test PRIVATE
+    ${PROJECT_SOURCE_DIR}/modules/cup
+)
+add_test(NAME ngm_cup_qs_analytical_duration_test COMMAND ngm_cup_qs_analytical_duration_test)
+set_tests_properties(ngm_cup_qs_analytical_duration_test PROPERTIES TIMEOUT 10)
+
 add_executable(ngm_cup_mie_smoke cup_mie_smoke.cpp)
 target_link_libraries(ngm_cup_mie_smoke PRIVATE nano_geo_matrix)
 target_include_directories(ngm_cup_mie_smoke PRIVATE

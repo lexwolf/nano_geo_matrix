@@ -723,9 +723,9 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 					"\t"<<std::setw(13)<<std::setiosflags (std::ios::left)<<N<<            // 8 Im(q2)
 					std::endl;
 				}
-			if (amp == 1 && norm(dip)/E0 > 5.e26) break;
+			if (amp == 1 && norm(dip)/E0 > 5.e26 && steste == 1) break;
 			if (amp == 0 && t_ps>2.*tpump) 
-				if (fabs((norm(dip)-dnormem)/norm(dip)) < 1.e-20) break;
+				if (fabs((norm(dip)-dnormem)/norm(dip)) < 1.e-20 && steste == 1) break;
 		    }
 
 		free_evec(EVE, 3);   // deletes EVE rows + EVE
