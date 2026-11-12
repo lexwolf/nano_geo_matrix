@@ -114,13 +114,6 @@ inline PermittivityContext make_permittivity_context(
 // Quasi-static solver routines extracted from cup.H.
 // Note: default arguments must appear only in declarations (inside class nanosphere).
 
-inline double nanosphere::Rabi_frec(double G, double tau2, double E0){
-
-		double omeR = 2.*sqrt(fabs(G)/tau2)*E0*1.e7;
-		return omeR;
-		
-}
-
 inline std::vector<std::pair<double,double>>  nanosphere::cross_sections(char* mdl , char* mtl ,char* hst ,double omemi, double omema, int omeN, char* sol, double rho, const char* output){
 
 			int omi;
@@ -335,12 +328,15 @@ inline std::vector<std::pair<double,std::complex<double>>>  nanosphere::steady_s
 
 inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hst,
                                double E0, double omeeV, double T, double tpump,
-                               char* sol, double rho, const char* pump_md, bool evolve_N, const char* output, double automatic_output_interval_ps){
+                               char* sol, double rho, const char* pump_md, bool evolve_N, const char* output, double automatic_output_interval_ps,
+                               const cup_convergence::Options& convergence_options){
     const double omep = eV2j*Ome_p*2.*M_PI/h;  // angular frequency (rad/s): Ep/hbar
     // All four time-dependent routines integrate with normalized dt=1.
     const auto output_cadence = T == 0
         ? cup_output_detail::automatic_cadence(automatic_output_interval_ps, omep, 1.)
         : cup_output_detail::Cadence{};
+    std::optional<cup_convergence::Monitor> convergence;
+    if (T == 0) convergence.emplace(convergence_options, true);
 
     constexpr int Nsys = 3;
 	PumpMode pm = pump_mode(pump_md);
@@ -348,7 +344,7 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
     const double eps_b = g.eps_b;
     const double eps_s = g.eps_s;
     double ome, dt;
-    double dnormem = 1.e20, dnavr = 0, dnavrm = 1.e20;
+    double dnormem = 1.e20;
 
     std::vector<std::complex<double>> wave;
     int wb = 0;
@@ -369,10 +365,6 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
     std::complex<double> *q = nullptr;
     std::complex<double> **A = nullptr;
     std::complex<double> *B  = nullptr;
-
-    double dpTOT = 0.0, t0 = 0.0;
-    double omeR = 0.0;
-    int AVE = 0;
 
     if (T == 0) { T = 100000; steste = 1; }
 
@@ -445,6 +437,7 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
     if (steste == 1) {
         iprint = output_cadence.steps;
         cup_output_detail::write_metadata({&dyna, &fnct}, automatic_output_interval_ps, output_cadence);
+        cup_convergence::write_options({&dyna, &fnct}, convergence_options, true, pm == PumpMode::Step ? "step" : "sin_zero_frequency_constant_half_target");
     }
 
     // Helper to build A,B for current N
@@ -462,8 +455,6 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 	double tNmax = 1.0;
 
 	double N = 0.0;
-
-	omeR = Rabi_frec(G, tau2, E0);
 
 	int i = 0;
 
@@ -522,32 +513,16 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
         if (steste == 1 ? cup_output_detail::scheduled(i-1, iprint) : i%iprint == 0)
             write_state();
 
-        if (t_ps > 2.*tpump) {
-            if (steste == 1 && cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-30)) {
-                termination_reason = "existing_instantaneous_intensity_convergence";
-                break;
-            }
-            if (cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-10)) wb = 1;
+        if (steste == 1 && t_ps >= tpump && convergence->update(t_ps, norm(dip))) {
+            termination_reason = convergence->result().classification;
+            break;
+        }
 
+        // Legacy guarded comparison below is ONLY for Fourier collection.
+        if (t_ps > 2.*tpump) {
+            if (cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-10)) wb = 1;
             if (wb == 1 && cup_stopping_detail::finite_positive(norm(dip)) &&
                 std::isfinite(dnormem)) wave.push_back(q[0]);
-
-            cup_stopping_detail::invalidate_average_if_needed(
-                omeR, t-t0, dpTOT + norm(dip), dnavr, dnavrm);
-
-            if (steste == 1 && cup_stopping_detail::relative_change_below(dnavr, dnavrm, 1.e-7)) {
-                termination_reason = "existing_block_average_convergence";
-                break;
-            }
-
-            if (AVE == 0) { t0 = t; AVE = 1; }
-            dpTOT += norm(dip);
-
-            if (cup_stopping_detail::averaging_window_complete(omeR, t-t0)) {
-                cup_stopping_detail::store_average(dpTOT, t-t0, dnavr, dnavrm);
-                AVE = 0;
-                dpTOT = 0;
-            }
         }
 
         if (wave.size() >= 150000) {
@@ -558,6 +533,8 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
     if (steste == 1) {
         if (last_written_step != i-1) write_state();
         cup_output_detail::write_termination({&dyna, &fnct}, termination_reason);
+        if (convergence->result().windows_or_cycles > 0)
+            cup_convergence::write_result({&dyna, &fnct}, convergence->result());
     }
 
     if (g.is_shell) {
@@ -586,19 +563,22 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 
 inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* hst,
 								double E0, double omeeV, double T, double tpump,
-								char* sol, double rho, const char* output, double automatic_output_interval_ps){
+								char* sol, double rho, const char* output, double automatic_output_interval_ps,
+								const cup_convergence::Options& convergence_options){
 		const double omep = eV2j*Ome_p*2.*M_PI/h;  // angular frequency (rad/s): Ep/hbar
 		// All four time-dependent routines integrate with normalized dt=1.
 		const auto output_cadence = T == 0
 		    ? cup_output_detail::automatic_cadence(automatic_output_interval_ps, omep, 1.)
 		    : cup_output_detail::Cadence{};
+		std::optional<cup_convergence::Monitor> convergence;
+		if (T == 0) convergence.emplace(convergence_options, false);
 
 		constexpr int Nsys = 3;
 
 		const auto g = cup_qs_detail::make_geometry_context(*this, hst, sol, rho);
 		const double eps_b = g.eps_b;
 		const double eps_s = g.eps_s;
-		double ome, dt, dnormem=1.e20;
+		double ome, dt;
 		int steste=0, amp=0;
 		std::complex<double> eps1e, eps2e, eps1, eps2, alph;
 		double t, t_ps, tau1, tau2, gamd, ome_g, pG = fabs(G), *nv, N, tildeN;
@@ -709,6 +689,7 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 		if (steste == 1) {
 		    iprint = output_cadence.steps;
 		    cup_output_detail::write_metadata({&dyna, &fnct}, automatic_output_interval_ps, output_cadence);
+			cup_convergence::write_options({&dyna, &fnct}, convergence_options, false);
 		}
 
 		// let's begin without pump
@@ -762,27 +743,27 @@ inline std::complex<double> nanosphere::analytical(char* mdl , char* mtl ,char* 
 				q[ii]   = qss[ii] + C[0]*EVE[ii][0]*exp(kap[0]*(t-t0))
 								  + C[1]*EVE[ii][1]*exp(kap[1]*(t-t0))
 								  + C[2]*EVE[ii][2]*exp(kap[2]*(t-t0));
-    
-		    dnormem = steste*norm(dip);
+
 		    dip = numerical_output(E0, q, p);
 		    alph = dip/E0;
 
 			if (steste == 1 ? cup_output_detail::scheduled(i-1, iprint) : i%iprint == 0)
 				write_state();
 			if (amp == 1 && steste == 1 && cup_stopping_detail::amplitude_above(norm(dip), E0, 5.e26)) {
-				termination_reason = "amplitude_cutoff";
+				termination_reason = "analytical_amplitude_cutoff";
 				break;
 			}
-			if (amp == 0 && t_ps>2.*tpump) 
-				if (steste == 1 && cup_stopping_detail::relative_change_below(norm(dip), dnormem, 1.e-20)) {
-					termination_reason = "existing_instantaneous_intensity_convergence";
-					break;
-				}
+			if (amp == 0 && steste == 1 && pip == 1 && convergence->update(t_ps, norm(dip))) {
+				termination_reason = convergence->result().classification;
+				break;
+			}
 		    }
 
 		if (steste == 1) {
 		    if (last_written_step != i-1) write_state();
 		    cup_output_detail::write_termination({&dyna, &fnct}, termination_reason);
+			if (convergence->result().windows_or_cycles > 0)
+				cup_convergence::write_result({&dyna, &fnct}, convergence->result());
 		}
 
 		free_evec(EVE, 3);   // deletes EVE rows + EVE

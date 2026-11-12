@@ -64,7 +64,7 @@ struct Run {
 
 Run run(const fs::path& directory, bool analytical, double duration,
         double interval = 0.1, double gain = .01, int order = 1,
-        double energy_scale = 1., bool use_default = false, double pump_time = 0.)
+        double energy_scale = 1., bool use_default = false, double pump_time = 0., bool maximum_fixture = false)
 {
     fs::create_directories(directory / "num");
     fs::create_directories(directory / "anl");
@@ -83,6 +83,8 @@ Run run(const fs::path& directory, bool analytical, double duration,
     char model[] = "drude", metal[] = "silver", host[] = "vacuum";
     const double frequency = eV2j*s.Ome_p*2.*M_PI/h;
     const double step_ps = 1.e12/frequency;
+    cup_convergence::Options options;
+    if (maximum_fixture) { options.flat_window_ps = 1.e6; options.periodic_min_span_ps = 1.e6; }
     Run result;
 #ifdef CUP_TEST_MIE
 #define ORDER_ARG order,
@@ -96,14 +98,14 @@ Run run(const fs::path& directory, bool analytical, double duration,
                                        duration, pump_time, nullptr, 0., directory.c_str());
         else
             result.state = s.analytical(ORDER_ARG model, metal, host, 1., 3.5*energy_scale,
-                                       duration, pump_time, nullptr, 0., directory.c_str(), interval);
+                                       duration, pump_time, nullptr, 0., directory.c_str(), interval, options);
     } else {
         if (use_default)
             result.state = s.numerical(ORDER_ARG model, metal, host, 1., 3.5*energy_scale,
                                       duration, pump_time, nullptr, 0., "step", false, directory.c_str());
         else
             result.state = s.numerical(ORDER_ARG model, metal, host, 1., 3.5*energy_scale,
-                                      duration, pump_time, nullptr, 0., "step", false, directory.c_str(), interval);
+                                      duration, pump_time, nullptr, 0., "step", false, directory.c_str(), interval, options);
     }
     require(std::isfinite(result.state.real()) && std::isfinite(result.state.imag()), "Nonfinite returned state");
     const std::string prefix = analytical ? "anl" : "num";
@@ -138,6 +140,18 @@ Run run(const fs::path& directory, bool analytical, double duration,
                 require(std::abs(file.rows[j][0]-expected_time) < 5.e-6*std::max(1., expected_time), "Wrong regular cadence");
             }
             require(!file.metadata.at("termination_reason").empty(), "Missing termination reason");
+            require(std::stod(file.metadata.at("convergence_flat_window_ps")) == options.flat_window_ps,
+                    "Effective convergence options missing");
+            if (file.metadata.at("termination_reason") == "sustained_flat") {
+                const double start = std::stod(file.metadata.at("convergence_start_ps"));
+                const double initial = std::stod(file.metadata.at("convergence_qualifying_end_ps"));
+                const double confirmed = std::stod(file.metadata.at("convergence_confirmation_end_ps"));
+                require(start >= pump_time && initial-start >= options.flat_windows*options.flat_window_ps-1.e-9 &&
+                        confirmed-initial >= options.flat_confirmation_windows*options.flat_window_ps-1.e-9,
+                        "Incomplete sustained evidence or pre-pump history");
+                require(std::stod(file.metadata.at("convergence_detected_at_ps")) == file.rows.back()[0],
+                        "Evidence metadata not tied to terminal state");
+            }
         } else {
             require(file.metadata.count("actual_output_interval_ps") == 0 &&
                     file.metadata.count("termination_reason") == 0, "Fixed-run metadata changed");
@@ -187,10 +201,12 @@ int main()
             const auto normal = run(directory/(name+"-default"), analytical, 0., .1, .01, 1, 1., true);
             const auto alternate = run(directory/(name+"-alternate"), analytical, 0., .07);
             same_stop(normal, alternate);
-            const auto every_step = run(directory/(name+"-every-step"), analytical, 0., step_ps/2.);
-            same_stop(normal, every_step);
+            // The sustained default observation is tens of ps: use a fine saved
+            // cadence here, and exercise sub-step cadence on the bounded cutoff below.
+            const auto fine_spacing = run(directory/(name+"-fine-spacing"), analytical, 0., .005);
+            same_stop(normal, fine_spacing);
             require(normal.files[0].metadata.at("termination_reason") ==
-                    (analytical ? "existing_instantaneous_intensity_convergence" : "existing_block_average_convergence"), "Unexpected convergence criterion");
+                    "sustained_flat", "Unexpected convergence criterion");
             if (!analytical) {
                 const auto delayed = run(directory/(name+"-spacing"), false, 0., .1, .01, 1, 1., false, .2);
                 require(delayed.files[0].rows.size() >= 4, "Too few default-cadence rows to verify spacing");
@@ -202,7 +218,7 @@ int main()
                 require(fixed.files[j].text == fixed_other.files[j].text, "Fixed output changed with unused interval");
             // Scale all energies down to exhaust the unchanged 100000 ps ceiling
             // in 15 iterations, preserving normalized equations and Mie geometry.
-            const auto exhausted = run(directory/(name+"-maximum"), analytical, 0., 15000., .01, 1, 1.e-8);
+            const auto exhausted = run(directory/(name+"-maximum"), analytical, 0., 15000., .01, 1, 1.e-8, false, 0., true);
             require(exhausted.files[0].metadata.at("termination_reason") == "maximum_duration_exhaustion", "Maximum duration reason missing");
             const double slow_step = step_ps/1.e-8;
             require(std::abs(exhausted.files[0].rows.back()[0] - std::floor(100000./slow_step)*slow_step) < 1., "Maximum terminal time incorrect");
@@ -215,8 +231,10 @@ int main()
                       << ", rows=" << normal.files[0].rows.size() << '\n';
         }
         const auto early = run(directory/"early-amplitude", true, 0., .1, 4.);
-        require(early.files[0].metadata.at("termination_reason") == "amplitude_cutoff", "Expected amplitude cutoff");
+        require(early.files[0].metadata.at("termination_reason") == "analytical_amplitude_cutoff", "Expected amplitude cutoff");
         require(early.files[0].rows.size() == 1 && early.files[0].rows[0][0] < .1, "Early terminal row not saved");
+        const auto early_every_step = run(directory/"early-every-step", true, 0., step_ps/2., 4.);
+        same_stop(early, early_every_step);
         std::cout << "early analytical amplitude cutoff=" << early.files[0].rows[0][0] << " ps\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

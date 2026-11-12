@@ -14,6 +14,7 @@
 # error "You must define CUP_BACKEND_QUASI_STATIC or CUP_BACKEND_MIE before including cup.H"
 #endif
 
+#include "convergence.hpp"
 #include "config.hpp"
 
 #ifdef CUP_BACKEND_QUASI_STATIC
@@ -110,8 +111,6 @@ public:
     std::complex<double> *set_ome_dep_vrbls(double ome, double ome_g, double tau2, double gamd);
 
     // shared utilities
-    double Rabi_frec(double G, double tau2, double E0);
-
     double find_Ome_fourier(
         int nfft,
         const std::vector<std::complex<double>>& wave,
@@ -154,13 +153,15 @@ public:
               double E0, double omeeV, double T, double tpump,
               char* sol=0, double rho=0, const char* pump_md="step", bool evolve_N=true,
               const char* output = "../data/output",
-              double automatic_output_interval_ps = 0.1);
+              double automatic_output_interval_ps = 0.1,
+              const cup_convergence::Options& convergence_options = {});
 
     std::complex<double>
     analytical(char* mdl , char* mtl ,char* hst,
                double E0, double omeeV, double T, double tpump,
                char* sol=0, double rho=0, const char* output = "../data/output",
-               double automatic_output_interval_ps = 0.1);
+               double automatic_output_interval_ps = 0.1,
+               const cup_convergence::Options& convergence_options = {});
 #endif
 
 #ifdef CUP_BACKEND_MIE
@@ -209,13 +210,15 @@ public:
               double E0, double omeeV, double T, double tpump,
               char* sol=0, double rho=0, const char* pump_md="step", bool evolve_N=true,
               const char* output = "../data/output",
-              double automatic_output_interval_ps = 0.1);
+              double automatic_output_interval_ps = 0.1,
+              const cup_convergence::Options& convergence_options = {});
 
     std::complex<double>
     analytical(int order, char* mdl , char* mtl ,char* hst,
                double E0, double omeeV, double T, double tpump,
                char* sol=0, double rho=0, const char* output = "../data/output",
-               double automatic_output_interval_ps = 0.1);
+               double automatic_output_interval_ps = 0.1,
+               const cup_convergence::Options& convergence_options = {});
 
 #endif
 }; // class nanosphere
