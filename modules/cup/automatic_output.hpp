@@ -45,6 +45,16 @@ inline bool scheduled(int completed_step, int steps)
     return completed_step > 0 && completed_step % steps == 0;
 }
 
+// Preserve distinguishable automatic timestamps without changing value columns.
+inline std::ostream& write_timestamp(std::ostream& file, double time_ps, bool automatic)
+{
+    const auto precision = file.precision();
+    if (automatic) file.precision(std::numeric_limits<double>::max_digits10);
+    file << "  " << std::setw(8) << std::setiosflags(std::ios::left) << time_ps;
+    file.precision(precision);
+    return file;
+}
+
 inline void write_metadata(std::initializer_list<std::ostream*> files,
                            double requested_ps, const Cadence& cadence)
 {

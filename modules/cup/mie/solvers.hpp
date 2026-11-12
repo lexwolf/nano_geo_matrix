@@ -576,17 +576,17 @@ inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* m
 		const char* termination_reason = "maximum_duration_exhaustion";
 		const auto write_state = [&]() {
 			if(order==1)
-			    dyna<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
+			    cup_output_detail::write_timestamp(dyna, t_ps, steste == 1)
 			        <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(alph)
 			        <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(alph)
 			        <<"\n";
 
-			a_aj<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
+			cup_output_detail::write_timestamp(a_aj, t_ps, steste == 1)
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(aj)
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(aj)
 			    <<"\n";
 
-			fnct<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
+			cup_output_detail::write_timestamp(fnct, t_ps, steste == 1)
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[0])
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[0])
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[1])
@@ -868,17 +868,17 @@ inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* 
 		const char* termination_reason = "maximum_duration_exhaustion";
 		const auto write_state = [&]() {
 			if(order==1)
-			    dyna<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
+			    cup_output_detail::write_timestamp(dyna, t_ps, steste == 1)
 			        <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(alph)
 			        <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(alph)
 			        <<"\n";
 
-			a_aj<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
+			cup_output_detail::write_timestamp(a_aj, t_ps, steste == 1)
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(aj)
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(aj)
 			    <<"\n";
 
-			fnct<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
+			cup_output_detail::write_timestamp(fnct, t_ps, steste == 1)
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[0])
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[0])
 			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[1])

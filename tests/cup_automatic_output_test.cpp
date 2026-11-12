@@ -125,6 +125,10 @@ Run run(const fs::path& directory, bool analytical, double duration,
             require(std::stod(file.metadata.at("requested_output_interval_ps")) == interval, "Wrong requested interval");
             require(std::stod(file.metadata.at("actual_output_interval_ps")) == cadence.actual_ps, "Wrong rounded interval");
             require(std::stoi(file.metadata.at("output_interval_steps")) == cadence.steps, "Wrong step count");
+            for (const auto& row : file.rows) {
+                const auto step = std::llround(row[0]/step_ps);
+                require(row[0] == step*1.e12/frequency, "Automatic timestamp lost precision");
+            }
             const auto terminal_step = std::llround(file.rows.back()[0]/step_ps);
             const auto scheduled_rows = terminal_step/cadence.steps;
             const auto expected_rows = scheduled_rows + (terminal_step % cadence.steps != 0 || terminal_step == 0 ? 1 : 0);
