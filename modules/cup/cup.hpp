@@ -15,6 +15,7 @@
 #endif
 
 #include "convergence.hpp"
+#include <functional>
 #include "config.hpp"
 
 #ifdef CUP_BACKEND_QUASI_STATIC
@@ -154,7 +155,8 @@ public:
               char* sol=0, double rho=0, const char* pump_md="step", bool evolve_N=true,
               const char* output = "../data/output",
               double automatic_output_interval_ps = 0.1,
-              const cup_convergence::Options& convergence_options = {});
+              const cup_convergence::Options& convergence_options = {},
+              const std::function<bool(double, double, const cup_convergence::Result&)>& post_acceptance = {});
 
     std::complex<double>
     analytical(char* mdl , char* mtl ,char* hst,

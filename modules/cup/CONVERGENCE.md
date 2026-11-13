@@ -162,3 +162,24 @@ certificate of periodic convergence. A changed automatic endpoint can change
 which tail reaches Fourier analysis. That existing FFT is still run only by
 the solver's Fourier path, never by the convergence monitor. The Fourier
 collection and public return-status redesign are deferred.
+
+## Optional quasi-static post-acceptance observation
+
+Only the quasi-static numerical method additionally accepts a trailing
+`const std::function<bool(double,double,const Result&)>& post_acceptance = {}`.
+This callback receives physical time in ps, `norm(dip)` at every integration
+step starting at convergence detection, and the frozen original accepted result.
+Returning false continues the same trajectory; true ends observation. The
+existing automatic ceiling is unchanged. `post_acceptance_status` separately
+records completion/incompletion, while convergence metadata retains the original
+decision and interval. The terminal sample/returned state belongs to the later
+observation endpoint. An empty callback preserves the existing stopping point,
+output, and return state. Fixed-duration mode never calls it.
+
+`Monitor::set_cycle_observer` plus `observe_cycle_sample` provides observation-only
+complete-cycle statistics through the existing hysteretic extrema tracker. Use
+a fresh monitor for this API and do not mix it with `update`. It performs no
+convergence decision and stores no candidate cycle history. The callback receives
+start/end time, trapezoidal mean, minimum, and maximum. Invalid samples reset
+cycle evidence; missing cycles do not imply zero oscillation. Applications must
+set their own bounded observation budget and report unresolved observations.

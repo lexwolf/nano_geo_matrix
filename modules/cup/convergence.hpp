@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -47,6 +49,8 @@ struct Options {
     }
 };
 
+struct CycleObservation { double start_ps, end_ps, mean, minimum, maximum; };
+
 struct Result {
     const char* classification = "unclassified";
     double start_ps = 0., qualifying_end_ps = 0., confirmation_end_ps = 0., detected_at_ps = 0.;
@@ -57,6 +61,7 @@ struct Result {
 };
 
 class Monitor {
+    std::function<void(const CycleObservation&)> cycle_observer_;
     using Real = long double;
     struct Point { double t = 0., y = 0.; Real area = 0.; };
     struct Window { double start, end; Real low, high, mean; };
@@ -167,6 +172,11 @@ class Monitor {
             const Real period = p.t-last_peak_.t;
             if (!(period > 0.)) return;
             const Real high = std::max(p.y, last_peak_.y), low = valley_.y;
+            if (cycle_observer_) {
+                cycle_observer_({last_peak_.t, p.t, double((p.area-last_peak_.area)/period), double(low), double(high)});
+                last_peak_ = p; have_peak_ = true;
+                return;
+            }
             cycles_.push_back({last_peak_.t, p.t, low, high, (p.area-last_peak_.area)/period, high-low, last_peak_.y});
             if (cycles_.size() > std::size_t(opt_.max_periodic_cycles)) {
                 cycles_.pop_front(); cycle_candidate_ = false;
@@ -233,6 +243,20 @@ public:
         previous_ = p;
         if (accepted_) result_.detected_at_ps = time_ps;
         return accepted_;
+    }
+    // Observation only: reuse the same hysteresis/extrema and cycle integrals,
+    // without flat/periodic acceptance or retaining candidate cycle records.
+    void set_cycle_observer(std::function<void(const CycleObservation&)> observer) { cycle_observer_ = std::move(observer); }
+    void observe_cycle_sample(double time_ps, double intensity) {
+        if (!cycle_observer_) throw std::logic_error("Cycle observer is required");
+        if (!std::isfinite(time_ps) || !std::isfinite(intensity) || intensity < 0. ||
+            (have_sample_ && time_ps <= previous_.t)) { reset(); return; }
+        Point p{time_ps, intensity, 0.};
+        if (!have_sample_) { start(p); return; }
+        integral_ += (Real(previous_.y)+intensity)*.5L*(Real(time_ps)-previous_.t);
+        p.area = integral_;
+        periodic_sample(p);
+        previous_ = p;
     }
     const Result& result() const { return result_; }
     std::size_t stored_records() const { return windows_.size()+cycles_.size(); }

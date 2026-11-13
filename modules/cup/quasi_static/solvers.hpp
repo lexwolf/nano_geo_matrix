@@ -329,7 +329,8 @@ inline std::vector<std::pair<double,std::complex<double>>>  nanosphere::steady_s
 inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hst,
                                double E0, double omeeV, double T, double tpump,
                                char* sol, double rho, const char* pump_md, bool evolve_N, const char* output, double automatic_output_interval_ps,
-                               const cup_convergence::Options& convergence_options){
+                               const cup_convergence::Options& convergence_options,
+                               const std::function<bool(double, double, const cup_convergence::Result&)>& post_acceptance){
     const double omep = eV2j*Ome_p*2.*M_PI/h;  // angular frequency (rad/s): Ep/hbar
     // All four time-dependent routines integrate with normalized dt=1.
     const auto output_cadence = T == 0
@@ -460,6 +461,7 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 
     int last_written_step = -1;
     const char* termination_reason = "maximum_duration_exhaustion";
+    bool convergence_accepted = false, observation_complete = false;
     const auto write_state = [&]() {
         cup_output_detail::write_timestamp(dyna, t_ps, steste == 1)
              << "\t" << std::setw(13) << std::setiosflags(std::ios::left) << real(alph)
@@ -513,9 +515,12 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
         if (steste == 1 ? cup_output_detail::scheduled(i-1, iprint) : i%iprint == 0)
             write_state();
 
-        if (steste == 1 && t_ps >= tpump && convergence->update(t_ps, norm(dip))) {
-            termination_reason = convergence->result().classification;
-            break;
+        if (steste == 1 && t_ps >= tpump) {
+            if (!convergence_accepted) convergence_accepted = convergence->update(t_ps, norm(dip));
+            if (convergence_accepted) {
+                termination_reason = convergence->result().classification;
+                if (!post_acceptance || (observation_complete = post_acceptance(t_ps, norm(dip), convergence->result()))) break;
+            }
         }
 
         // Legacy guarded comparison below is ONLY for Fourier collection.
@@ -532,6 +537,10 @@ inline std::complex<double> nanosphere::numerical(char* mdl, char* mtl, char* hs
 
     if (steste == 1) {
         if (last_written_step != i-1) write_state();
+        if (post_acceptance) {
+            for (auto* stream : {&dyna, &fnct})
+                *stream << "# post_acceptance_status = " << (observation_complete ? "complete" : "incomplete") << "\n";
+        }
         cup_output_detail::write_termination({&dyna, &fnct}, termination_reason);
         if (convergence->result().windows_or_cycles > 0)
             cup_convergence::write_result({&dyna, &fnct}, convergence->result());
