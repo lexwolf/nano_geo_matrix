@@ -22,6 +22,8 @@
 #else
 
 #include "../pump.hpp"
+#include "../stopping_arithmetic.hpp"
+#include "../automatic_output.hpp"
 #include <filesystem>
 
 // includes
@@ -32,10 +34,6 @@
 // Mie backend solvers & observables extracted from cupN.H.
 // Provides out-of-class inline definitions of nanosphere member functions.
 
-inline double nanosphere::Rabi_frec(double G, double tau2, double E0){
-		double omeR = 2.*sqrt(fabs(G)/tau2)*E0*1.e7;
-		return omeR;
-		}
 
 	std::pair<double,double>  nanosphere::mie_cs(int orders, double omeeV ,char* mdl , char* mtl ,char* hst , char* sol, double rho){
 		std::pair<double,double> CC;
@@ -402,10 +400,19 @@ inline std::vector<std::pair<double,std::complex<double>>>  nanosphere::steady_s
 
 inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* mtl ,char* hst,
 								double E0, double omeeV, double T, double tpump,
-								char* sol, double rho, const char* pump_md, bool evolve_N, const char* output){
+								char* sol, double rho, const char* pump_md, bool evolve_N, const char* output, double automatic_output_interval_ps,
+								const cup_convergence::Options& convergence_options){
+		const double omep = eV2j*Ome_p*2.*M_PI/h;  // angular frequency (rad/s): Ep/hbar
+		// All four time-dependent routines integrate with normalized dt=1.
+		const auto output_cadence = T == 0
+		    ? cup_output_detail::automatic_cadence(automatic_output_interval_ps, omep, 1.)
+		    : cup_output_detail::Cadence{};
+		std::optional<cup_convergence::Monitor> convergence;
+		if (T == 0) convergence.emplace(convergence_options, true);
+
 		constexpr int Nsys = 5;
 		PumpMode pm = pump_mode(pump_md);
-		double eps_b, eps_s, ome, dt, dnormem=1.e20, dnavr=0, dnavrm=1.e20, tildeN;
+		double eps_b, eps_s, ome, dt, dnormem=1.e20, tildeN;
 		std::vector<std::complex<double>> wave;
 
 		int ns = 0;
@@ -418,15 +425,12 @@ inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* m
 		std::complex<double> eps1e, eps2e, eps1, eps2, alph, m, x, k,
 							*p=nullptr, *p0=nullptr, *p1=nullptr, *p2=nullptr, *p3=nullptr, n1, n2;
 
-		double omep, t, t_ps, tau1, tau2, gamd, lam, ome_g, pG = fabs(G);
+		double t, t_ps, tau1, tau2, gamd, lam, ome_g, pG = fabs(G);
 		double *nv = nullptr;
 
 		std::complex<double> GamGxN, OmeG, chiH,
 							GamM, OmeM, chiP, **A=nullptr, *B=nullptr, aj, po, *odv=nullptr;
 
-		double dpTOT=0, t0=0;
-		double omeR=0;
-		int AVE=0;
 
 		if (T==0) { T=100000; steste=1; }
 		namespace fs = std::filesystem;
@@ -517,8 +521,6 @@ inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* m
 		};
 
 		// --- physics setup ---------------------------------------------------
-		omep = eV2j*Ome_p/h;  // Hz
-
 		nv   = normalized_variables();
 		tau1 = nv[0];
 		tau2 = nv[1];
@@ -551,15 +553,52 @@ inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* m
 		int Nprint_max = 500000;
 		int iprint = std::max(1, Nt / Nprint_max);
 
+		if (steste == 1) {
+		    iprint = output_cadence.steps;
+		    cup_output_detail::write_metadata({&fnct, &a_aj}, automatic_output_interval_ps, output_cadence);
+			cup_convergence::write_options({&fnct, &a_aj}, convergence_options, true, pm == PumpMode::Step ? "step" : "sin_zero_frequency_constant_half_target");
+		    if (order == 1) cup_output_detail::write_metadata({&dyna}, automatic_output_interval_ps, output_cadence);
+			if (order == 1) cup_convergence::write_options({&dyna}, convergence_options, true, pm == PumpMode::Step ? "step" : "sin_zero_frequency_constant_half_target");
+		}
+
 		double tNmin = 0.0;
 		double tNmax = 1.0;
 
 		double N = tNmin;
 		rebuild_medium(N);
 		rebuild_linear_system();
-		omeR = Rabi_frec(G, tau2, E0);
+
 
 		int i=0;
+		int last_written_step = -1;
+		const char* termination_reason = "maximum_duration_exhaustion";
+		const auto write_state = [&]() {
+			if(order==1)
+			    cup_output_detail::write_timestamp(dyna, t_ps, steste == 1)
+			        <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(alph)
+			        <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(alph)
+			        <<"\n";
+
+			cup_output_detail::write_timestamp(a_aj, t_ps, steste == 1)
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(aj)
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(aj)
+			    <<"\n";
+
+			cup_output_detail::write_timestamp(fnct, t_ps, steste == 1)
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[0])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[0])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[1])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[1])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[2])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[2])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[3])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[3])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[4])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[4])
+			    <<"\n";
+			last_written_step = i-1;
+		};
+
 		while (i<=Nt){
 			t=i*dt;
 			t_ps = t * 1.e+12 / omep; // time in picoseconds
@@ -588,52 +627,30 @@ inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* m
 			if (order==1) alph = polarizability(aj, eps2, lam);
 			else          alph = {0,0};
 
-				if(i%iprint==0){
-					if(order==1)
-						dyna<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
-							<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(alph)
-							<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(alph)
-							<<"\n";
+			if (steste == 1 ? cup_output_detail::scheduled(i-1, iprint) : i%iprint == 0)
+				write_state();
 
-					a_aj<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(aj)
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(aj)
-						<<"\n";
-
-					fnct<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[0])
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[0])
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[1])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[1])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[2])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[2])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[3])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[3])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[4])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[4])
-					<<"\n";
+			if (steste == 1 && t_ps >= tpump && convergence->update(t_ps, norm(aj))) {
+				termination_reason = convergence->result().classification;
+				break;
 			}
 
-			if (t_ps > 2.*tpump){
-				if (fabs((norm(aj)-dnormem)/norm(aj)) < 1.e-20 && steste==1) break;
-
-				if (fabs((norm(aj)-dnormem)/norm(aj)) < 1.e-10) wave.push_back(q[0]);
-
-				if (fabs((dnavr-dnavrm)/dnavr) < 1.e-6 && steste==1) break;
-
-				if (AVE==0){ t0=t; AVE=1; }
-				dpTOT += norm(aj);
-
-				omeR = Rabi_frec(G*N, tau2, E0);
-				if (t-t0 >= 1000/omeR){
-					dnavrm=dnavr;
-					dnavr=dpTOT/(t-t0);
-					AVE=0;
-					dpTOT =0;
-				}
+			// Legacy guarded comparison below is ONLY for Fourier collection.
+			if (t_ps > 2.*tpump) {
+				if (cup_stopping_detail::relative_change_below(norm(aj), dnormem, 1.e-10)) wave.push_back(q[0]);
 			}
 
 			if (wave.size()>=150000) wave.erase(wave.begin(), wave.begin()+50000);
+		}
+
+		if (steste == 1) {
+		    if (last_written_step != i-1) write_state();
+		    cup_output_detail::write_termination({&fnct, &a_aj}, termination_reason);
+			if (convergence->result().windows_or_cycles > 0)
+				cup_convergence::write_result({&fnct, &a_aj}, convergence->result());
+		    if (order == 1) cup_output_detail::write_termination({&dyna}, termination_reason);
+			if (order == 1 && convergence->result().windows_or_cycles > 0)
+				cup_convergence::write_result({&dyna}, convergence->result());
 		}
 
 		if (ns==1){
@@ -661,10 +678,19 @@ inline std::complex<double> nanosphere::numerical(int order, char* mdl , char* m
 
 inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* mtl ,char* hst,
 									double E0, double omeeV, double T, double tpump,
-									char* sol, double rho, const char* output){
+									char* sol, double rho, const char* output, double automatic_output_interval_ps,
+									const cup_convergence::Options& convergence_options){
+		const double omep = eV2j*Ome_p*2.*M_PI/h;  // angular frequency (rad/s): Ep/hbar
+		// All four time-dependent routines integrate with normalized dt=1.
+		const auto output_cadence = T == 0
+		    ? cup_output_detail::automatic_cadence(automatic_output_interval_ps, omep, 1.)
+		    : cup_output_detail::Cadence{};
+		std::optional<cup_convergence::Monitor> convergence;
+		if (T == 0) convergence.emplace(convergence_options, false);
+
 		constexpr int Nsys = 5;
 
-		double eps_b, eps_s, ome, dt, dnormem=1.e20, tildeN;
+		double eps_b, eps_s, ome, dt, tildeN;
 		int ns=0;
 		if (sol != NULL) { eps_s=set_host(sol); ns=1; }
 		else             { eps_s=0; }
@@ -675,7 +701,7 @@ inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* 
 		std::complex<double> eps1e, eps2e, eps1, eps2, alph, m, x, k,
 							*p=nullptr, *p0=nullptr, *p1=nullptr, *p2=nullptr, *p3=nullptr, n1, n2;
 
-		double omep, t, t_ps, tau2, gamd, ome_g, pG = fabs(G), *nv=nullptr, lam;
+		double t, t_ps, tau2, gamd, ome_g, pG = fabs(G), *nv=nullptr, lam;
 
 		std::complex<double> GamGxN, OmeG, chiH,
 							GamM, OmeM, chiP, **A=nullptr, *B=nullptr, aj, *odv=nullptr;
@@ -778,8 +804,6 @@ inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* 
 		};
 
 		// --- setup -----------------------------------------------------------
-		omep = eV2j*Ome_p/h;  // Hz
-
 		nv   = normalized_variables();
 		tau2 = nv[1];
 		gamd = nv[2];
@@ -811,6 +835,14 @@ inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* 
 		int Nprint_max = 500000;
 		int iprint = std::max(1, Nt / Nprint_max);
 
+		if (steste == 1) {
+		    iprint = output_cadence.steps;
+		    cup_output_detail::write_metadata({&fnct, &a_aj}, automatic_output_interval_ps, output_cadence);
+			cup_convergence::write_options({&fnct, &a_aj}, convergence_options, false);
+		    if (order == 1) cup_output_detail::write_metadata({&dyna}, automatic_output_interval_ps, output_cadence);
+			if (order == 1) cup_convergence::write_options({&dyna}, convergence_options, false);
+		}
+
 		// start: no pump
 		tildeN = 0.0;
 		double N = tildeN;
@@ -821,6 +853,35 @@ inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* 
 
 		double t0 = 0.0;
 		int i=0, pip=0;
+
+		int last_written_step = -1;
+		const char* termination_reason = "maximum_duration_exhaustion";
+		const auto write_state = [&]() {
+			if(order==1)
+			    cup_output_detail::write_timestamp(dyna, t_ps, steste == 1)
+			        <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(alph)
+			        <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(alph)
+			        <<"\n";
+
+			cup_output_detail::write_timestamp(a_aj, t_ps, steste == 1)
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(aj)
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(aj)
+			    <<"\n";
+
+			cup_output_detail::write_timestamp(fnct, t_ps, steste == 1)
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[0])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[0])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[1])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[1])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[2])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[2])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[3])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[3])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[4])
+			    <<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[4])
+			    <<"\n";
+			last_written_step = i-1;
+		};
 
 		while(i<=Nt){
 			t=i*dt;
@@ -857,42 +918,33 @@ inline std::complex<double> nanosphere::analytical(int order, char* mdl , char* 
 				q[ii] = s;
 			}
 
-			dnormem = steste*norm(aj);
 			aj = numerical_output(E0, q, p)/E0;
 
 			if(order==1) alph = polarizability(aj, eps2e, lam);
 			else         alph = {0,0};
 
-				if(i%iprint==0){
-					if(order==1)
-						dyna<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
-							<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(alph)
-							<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(alph)
-							<<"\n";
+			if (steste == 1 ? cup_output_detail::scheduled(i-1, iprint) : i%iprint == 0)
+				write_state();
 
-					a_aj<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(aj)
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(aj)
-						<<"\n";
-
-					fnct<<"  "<<std::setw(8)<<std::setiosflags(std::ios::left)<<t_ps
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[0])
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[0])
-						<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[1])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[1])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[2])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[2])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[3])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[3])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<real(q[4])
-					<<"\t"<<std::setw(13)<<std::setiosflags(std::ios::left)<<imag(q[4])
-					<<"\n";
+			if (amp==1 && steste == 1 && cup_stopping_detail::amplitude_above(norm(aj), E0, 5.e26)) {
+				termination_reason = "analytical_amplitude_cutoff";
+				break;
 			}
 
-			if (amp==1 && norm(aj)/E0 > 5.e26 && steste==1) break;
+			if (amp == 0 && steste == 1 && pip == 1 && convergence->update(t_ps, norm(aj))) {
+				termination_reason = convergence->result().classification;
+				break;
+			}
+		}
 
-			if (amp==0 && t_ps > 2.*tpump)
-				if (fabs((norm(aj)-dnormem)/norm(aj)) < 1.e-20 && steste==1) break;
+		if (steste == 1) {
+		    if (last_written_step != i-1) write_state();
+		    cup_output_detail::write_termination({&fnct, &a_aj}, termination_reason);
+			if (convergence->result().windows_or_cycles > 0)
+				cup_convergence::write_result({&fnct, &a_aj}, convergence->result());
+		    if (order == 1) cup_output_detail::write_termination({&dyna}, termination_reason);
+			if (order == 1 && convergence->result().windows_or_cycles > 0)
+				cup_convergence::write_result({&dyna}, convergence->result());
 		}
 
 		// --- cleanup ---------------------------------------------------------
