@@ -100,3 +100,10 @@ target_link_libraries(ngm_cup_nanoshell_convergence_test PRIVATE nano_geo_matrix
 target_include_directories(ngm_cup_nanoshell_convergence_test PRIVATE ${PROJECT_SOURCE_DIR}/modules/cup)
 add_test(NAME ngm_cup_nanoshell_convergence_test COMMAND ngm_cup_nanoshell_convergence_test)
 set_tests_properties(ngm_cup_nanoshell_convergence_test PROPERTIES TIMEOUT 60)
+
+# Pure scale calculation; no geometry, solver, or simulation is needed.
+add_executable(ngm_saturation_scale_test saturation_scale_test.cpp)
+target_compile_features(ngm_saturation_scale_test PRIVATE cxx_std_17)
+target_include_directories(ngm_saturation_scale_test PRIVATE ${PROJECT_SOURCE_DIR}/include)
+add_test(NAME ngm_saturation_scale_test COMMAND ngm_saturation_scale_test)
+set_tests_properties(ngm_saturation_scale_test PROPERTIES TIMEOUT 10)

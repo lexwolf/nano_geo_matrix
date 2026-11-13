@@ -365,3 +365,9 @@ MIT License (see LICENSE file)
 - No build-system side effects
 
 This repository represents the stabilized computational core extracted from research codebases.
+
+## Saturation scales
+
+The geometry-independent [saturation-scale utility](docs/saturation_scale.md)
+uses explicitly named energy inputs and validates optional normalized relaxation
+times. It is opt-in and does not change existing solver or reproduction behavior.
